@@ -51,22 +51,22 @@ const char *msg_type_2_str[MSG_MAX] =
  */
 int my_atoi(char *str, int *p_result)
 {
-		if (!str || !p_result)
-				return E_FAILURE;
+	if (!str || !p_result)
+		return E_FAILURE;
 
-		if ((*str != '+') && (*str != '-') && (!isdigit(*str)))
-				return E_FAILURE;
+	if ((*str != '+') && (*str != '-') && (!isdigit(*str)))
+		return E_FAILURE;
 
-		while (*(str++))
-				if (!isdigit(*str))
-						return E_FAILURE;
+	while (*(str++))
+		if (!isdigit(*str))
+			return E_FAILURE;
 
-		*p_result = strtol(str, NULL, 10);
+	*p_result = strtol(str, NULL, 10);
 
-		if (errno == ERANGE)
-				return E_FAILURE;
+	if (errno == ERANGE)
+		return E_FAILURE;
 
-		return E_SUCCESS;
+	return E_SUCCESS;
 }
 
 void print_usage()
@@ -76,205 +76,205 @@ void print_usage()
 
 void print_error(int err_val)
 {
-		printf("Error: ");
+	printf("Error: ");
 
-		// print relevant error
-		switch (err_val) {
-		case E_STDLIB:
-				printf("errno = %d\n", errno);
-				break;
-		case E_WINAPI:
-				printf("WinAPI Error 0x%X\n", GetLastError());
-				break;
-		case E_WINSOCK:
-				printf("Windows Socket Error %d\n", WSAGetLastError());
-				break;
-		case E_INTERNAL:
-				printf("Internal Error\n");
-				break;
-		default:
-				printf("Unknown Error\n");
-		}
+	// print relevant error
+	switch (err_val) {
+	case E_STDLIB:
+		printf("errno = %d\n", errno);
+		break;
+	case E_WINAPI:
+		printf("WinAPI Error 0x%X\n", GetLastError());
+		break;
+	case E_WINSOCK:
+		printf("Windows Socket Error %d\n", WSAGetLastError());
+		break;
+	case E_INTERNAL:
+		printf("Internal Error\n");
+		break;
+	default:
+		printf("Unknown Error\n");
+	}
 }
 
 //==============================================================================
 
 int check_input(struct server_env *p_env, int argc, char** argv)
 {
-		struct args *p_args = &p_env->args;
-		int ret_val = E_SUCCESS;
-		int port;
+	struct args *p_args = &p_env->args;
+	int ret_val = E_SUCCESS;
+	int port;
 
-		/* check number of arguments */
-		if (argc != ARGC) {
-				print_usage();
-				return E_FAILURE;
-		}
+	/* check number of arguments */
+	if (argc != ARGC) {
+		print_usage();
+		return E_FAILURE;
+	}
 
-		/* check server ip */
-		if (inet_addr(argv[1]) == INADDR_NONE) {
-				printf("\n%s is not a valid ip addres", argv[1]);
-				ret_val = E_FAILURE;
-		}
-		p_args->server_ip = argv[1];
+	/* check server ip */
+	if (inet_addr(argv[1]) == INADDR_NONE) {
+		printf("\n%s is not a valid ip addres", argv[1]);
+		ret_val = E_FAILURE;
+	}
+	p_args->server_ip = argv[1];
 
-		/* check port number */
-		port = strtol(argv[2], NULL, 10);
-		if (!((port > 0) && (port < 65536))) {
-				printf("\n%s is not a valid port", argv[2]);
-				ret_val = E_FAILURE;
-		}
-		p_args->server_port = port;
+	/* check port number */
+	port = strtol(argv[2], NULL, 10);
+	if (!((port > 0) && (port < 65536))) {
+		printf("\n%s is not a valid port", argv[2]);
+		ret_val = E_FAILURE;
+	}
+	p_args->server_port = port;
 
-		if (ret_val != E_SUCCESS)
-				print_usage();
+	if (ret_val != E_SUCCESS)
+		print_usage();
 
-		return ret_val;
+	return ret_val;
 }
 
 //==============================================================================
 
 int server_init(struct server_env *p_env)
 {
-		WSADATA	wsa_data;
-		int res;
+	WSADATA	wsa_data;
+	int res;
 
-		/* WinSockApi startup */
-		res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-		if (res) {
-				printf("Error: WSAStartup returnd with code 0x%X\n", res);
-				return E_FAILURE;
-		}
+	/* WinSockApi startup */
+	res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+	if (res) {
+		printf("Error: WSAStartup returnd with code 0x%X\n", res);
+		return E_FAILURE;
+	}
 
-		/* create socket */
-		p_env->skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (p_env->skt == SOCKET_ERROR) {
-				PRINT_ERROR(E_WINSOCK);
-				return E_FAILURE;
-		}
+	/* create socket */
+	p_env->skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (p_env->skt == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		return E_FAILURE;
+	}
 
-		/* set server address */
-		p_env->server.sin_family      = AF_INET;
-		p_env->server.sin_addr.s_addr = inet_addr(p_env->args.server_ip);
-		p_env->server.sin_port        = htons(p_env->args.server_port);
+	/* set server address */
+	p_env->server.sin_family      = AF_INET;
+	p_env->server.sin_addr.s_addr = inet_addr(p_env->args.server_ip);
+	p_env->server.sin_port        = htons(p_env->args.server_port);
 
-		/* bind socket to ip and port */
-		res = bind(p_env->skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
-		if (res == SOCKET_ERROR) {
-				PRINT_ERROR(E_WINSOCK);
-				return E_FAILURE;
-		}
+	/* bind socket to ip and port */
+	res = bind(p_env->skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
+	if (res == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		return E_FAILURE;
+	}
 
-		/* create file handle for stdin */
-		p_env->h_file_stdin = CreateFileA("CONIN$",
-										  GENERIC_READ,
-										  FILE_SHARE_READ,
-										  NULL,
-										  OPEN_EXISTING,
-										  FILE_FLAG_OVERLAPPED,
-										  NULL);
-		if (p_env->h_file_stdin == INVALID_HANDLE_VALUE) {
-				PRINT_ERROR(E_WINAPI);
-				return E_FAILURE;
-		}
+	/* create file handle for stdin */
+	p_env->h_file_stdin = CreateFileA("CONIN$",
+					  GENERIC_READ,
+					  FILE_SHARE_READ,
+					  NULL,
+					  OPEN_EXISTING,
+					  FILE_FLAG_OVERLAPPED,
+					  NULL);
+	if (p_env->h_file_stdin == INVALID_HANDLE_VALUE) {
+		PRINT_ERROR(E_WINAPI);
+		return E_FAILURE;
+	}
 
-		/* create event handle for overlapped stdin read */
-		p_env->olp_stdin.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-		if (p_env->olp_stdin.hEvent == NULL) {
-				PRINT_ERROR(E_WINAPI);
-				return E_FAILURE;
-		}
+	/* create event handle for overlapped stdin read */
+	p_env->olp_stdin.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+	if (p_env->olp_stdin.hEvent == NULL) {
+		PRINT_ERROR(E_WINAPI);
+		return E_FAILURE;
+	}
 
-		/* 
-		 * read stdin asynchronously for exit command.
-		 * asynchronous read will always return false.
-		 * error is detected by checking WSA last error.
-		 * io_penfing designates i/o pending completion
-		 * and thus not treated as an error.
-		 */ 
-		res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
-		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
-				PRINT_ERROR(E_WINAPI);
-				return E_FAILURE;
-		}
+	/* 
+	 * read stdin asynchronously for exit command.
+	 * asynchronous read will always return false.
+	 * error is detected by checking WSA last error.
+	 * io_penfing designates i/o pending completion
+	 * and thus not treated as an error.
+	 */ 
+	res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
+	if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
+		PRINT_ERROR(E_WINAPI);
+		return E_FAILURE;
+	}
 
-		return E_SUCCESS;
+	return E_SUCCESS;
 }
 
 //==============================================================================
 
 bool server_exit_test(struct server_env *p_env)
 {
-		DWORD wait_code;
-		int res;
+	DWORD wait_code;
+	int res;
 
-		/* check stdin input event */
-		wait_code = WaitForSingleObject(p_env->olp_stdin.hEvent, 1);
-		switch (wait_code) {
-		case WAIT_TIMEOUT:
-				return false;
-		case WAIT_OBJECT_0:
-				break;
-		case WAIT_FAILED:
-				PRINT_ERROR(E_WINAPI);
-				/* fall through */
-		case WAIT_ABANDONED:
-				/* fall through */
-		default:
-				return true;
-		}
+	/* check stdin input event */
+	wait_code = WaitForSingleObject(p_env->olp_stdin.hEvent, 1);
+	switch (wait_code) {
+	case WAIT_TIMEOUT:
+		return false;
+	case WAIT_OBJECT_0:
+		break;
+	case WAIT_FAILED:
+		PRINT_ERROR(E_WINAPI);
+		/* fall through */
+	case WAIT_ABANDONED:
+		/* fall through */
+	default:
+		return true;
+	}
 
-		if (strncmp(p_env->buffer, "exit", 5)) {
-				/* reset evt as prep for new read */
-				if (!ResetEvent(p_env->olp_stdin.hEvent)) {
-						PRINT_ERROR(E_WINAPI);
-						return true;
-				}
-				/* read asynchronously for exit command */
-				res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
-				if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
-						PRINT_ERROR(E_WINAPI);
-						return true;
-				}
-				return false;
-		} else {
-				return true;
+	if (strncmp(p_env->buffer, "exit", 5)) {
+		/* reset evt as prep for new read */
+		if (!ResetEvent(p_env->olp_stdin.hEvent)) {
+			PRINT_ERROR(E_WINAPI);
+			return true;
 		}
+		/* read asynchronously for exit command */
+		res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
+		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
+			PRINT_ERROR(E_WINAPI);
+			return true;
+		}
+		return false;
+	} else {
+		return true;
+	}
 }
 
 //==============================================================================
 
 int server_cleanup(struct server_env *p_env)
 {
-		int ret_val = E_SUCCESS;
+	int ret_val = E_SUCCESS;
 
-		if (p_env->olp_stdin.hEvent) {
-				if (!CloseHandle(p_env->olp_stdin.hEvent)) {
-						PRINT_ERROR(E_WINAPI);
-						ret_val = E_FAILURE;
-				}
+	if (p_env->olp_stdin.hEvent) {
+		if (!CloseHandle(p_env->olp_stdin.hEvent)) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_FAILURE;
 		}
+	}
 
-		if (p_env->h_file_stdin) {
-				if (!CloseHandle(p_env->h_file_stdin)) {
-						PRINT_ERROR(E_WINAPI);
-						ret_val = E_FAILURE;
-				}
+	if (p_env->h_file_stdin) {
+		if (!CloseHandle(p_env->h_file_stdin)) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_FAILURE;
 		}
+	}
 
-		if (p_env->skt != INVALID_SOCKET) {
-				if (closesocket(p_env->skt) == SOCKET_ERROR) {
-						PRINT_ERROR(E_WINSOCK);
-						ret_val = E_FAILURE;
-				}
+	if (p_env->skt != INVALID_SOCKET) {
+		if (closesocket(p_env->skt) == SOCKET_ERROR) {
+			PRINT_ERROR(E_WINSOCK);
+			ret_val = E_FAILURE;
 		}
+	}
 
-		if (WSACleanup()) {
-				PRINT_ERROR(E_WINSOCK);
-				ret_val = E_FAILURE;
-		}
+	if (WSACleanup()) {
+		PRINT_ERROR(E_WINSOCK);
+		ret_val = E_FAILURE;
+	}
 
-		return ret_val;
+	return ret_val;
 }
 
 //==============================================================================
