@@ -39,33 +39,32 @@
 
 int main(int argc, char **argv)
 {
-	struct server_env env = {0};
-	int ret_val = E_FAILURE;
+		struct server_env env = {0};
+		int ret_val = E_FAILURE;
 
-	if (check_input(&env, argc, argv))
-		return E_FAILURE;
+		if (check_input(&env, argc, argv))
+				return E_FAILURE;
 
-	int count = 0;
-	
-	// do-while(0) for easy cleanup
-	do {
-		if (server_init(&env))
-			break;
-
-		// execution loop
-		while (count < 100000) {
-			if (server_exit_test(&env))
-				break;
-			count++;
-		}
+		int count = 0;
 		
-		ret_val = E_SUCCESS;
+		/* do-while(0) for easy cleanup */
+		do {
+				if (server_init(&env))
+						break;
 
-	} while (0);
+				/* execution loop */
+				while (1) {
+						if (server_exit_test(&env))
+								break;
+						count++;
+				}
 
-	if (server_cleanup(&env))
-		ret_val = E_FAILURE;
+				ret_val = E_SUCCESS;
+		} while (0);
 
-	printf("BYBY BIRDY count=%d\n", count);
-	return ret_val;
+		if (server_cleanup(&env))
+				ret_val = E_FAILURE;
+
+		printf("BYBY BIRDY count=%d\n", count);
+		return ret_val;
 }
