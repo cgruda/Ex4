@@ -25,7 +25,7 @@
 #include <stdbool.h>
 #include "server_tasks.h"
 
-const char *msg_type_2_str[MSG_MAX] =
+char *msg_type_2_str[MSG_MAX] =
 {
 	[MSG_CLIENT_REQUEST]             = "CLIENT_REQUEST",
 	[MSG_CLIENT_VERSUS]              = "CLIENT_VERSUS",
@@ -97,10 +97,9 @@ void print_error(int err_val)
 	}
 }
 
-//==============================================================================
-
 int check_input(struct server_env *p_env, int argc, char** argv)
 {
+	DBG_PRINT("check_input\n");
 	struct args *p_args = &p_env->args;
 	int ret_val = E_SUCCESS;
 	int port;
@@ -120,7 +119,7 @@ int check_input(struct server_env *p_env, int argc, char** argv)
 
 	/* check port number */
 	port = strtol(argv[2], NULL, 10);
-	if (!((port > 0) && (port < 65536))) {
+	if (!((port > 0) && (port < MAX_PORT))) {
 		printf("\n%s is not a valid port", argv[2]);
 		ret_val = E_FAILURE;
 	}
@@ -132,38 +131,11 @@ int check_input(struct server_env *p_env, int argc, char** argv)
 	return ret_val;
 }
 
-//==============================================================================
-
 int server_init(struct server_env *p_env)
 {
+	DBG_PRINT("server_init\n");
 	WSADATA	wsa_data;
 	int res;
-
-	/* WinSockApi startup */
-	res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
-	if (res) {
-		printf("Error: WSAStartup returnd with code 0x%X\n", res);
-		return E_FAILURE;
-	}
-
-	/* create socket */
-	p_env->skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (p_env->skt == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		return E_FAILURE;
-	}
-
-	/* set server address */
-	p_env->server.sin_family      = AF_INET;
-	p_env->server.sin_addr.s_addr = inet_addr(p_env->args.server_ip);
-	p_env->server.sin_port        = htons(p_env->args.server_port);
-
-	/* bind socket to ip and port */
-	res = bind(p_env->skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
-	if (res == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		return E_FAILURE;
-	}
 
 	/* create file handle for stdin */
 	p_env->h_file_stdin = CreateFileA("CONIN$",
@@ -198,12 +170,43 @@ int server_init(struct server_env *p_env)
 		return E_FAILURE;
 	}
 
+	/* WinSockApi startup */
+	res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
+	if (res) {
+		printf("Error: WSAStartup returnd with code 0x%X\n", res);
+		return E_FAILURE;
+	}
+
+	/* create socket */
+	p_env->serv_skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (p_env->serv_skt == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		return E_FAILURE;
+	}
+
+	/* set server address */
+	p_env->server.sin_family      = AF_INET;
+	p_env->server.sin_addr.s_addr = inet_addr(p_env->args.server_ip);
+	p_env->server.sin_port        = htons(p_env->args.server_port);
+
+	/* bind socket to ip and port */
+	res = bind(p_env->serv_skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
+	if (res == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		return E_FAILURE;
+	}
+
+	/* place socket in listening state */
+	res = listen(p_env->serv_skt, SOMAXCONN);
+	if (res == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		return E_FAILURE;
+	}
+	
 	return E_SUCCESS;
 }
 
-//==============================================================================
-
-bool server_exit_test(struct server_env *p_env)
+bool server_quit(struct server_env *p_env)
 {
 	DWORD wait_code;
 	int res;
@@ -224,13 +227,15 @@ bool server_exit_test(struct server_env *p_env)
 		return true;
 	}
 
+	/*
+	 * reset read event and start a new asynchronous read
+	 * or return true if stdin input was "exit" command
+	 */
 	if (strncmp(p_env->buffer, "exit", 5)) {
-		/* reset evt as prep for new read */
 		if (!ResetEvent(p_env->olp_stdin.hEvent)) {
 			PRINT_ERROR(E_WINAPI);
 			return true;
 		}
-		/* read asynchronously for exit command */
 		res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
 		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
 			PRINT_ERROR(E_WINAPI);
@@ -238,14 +243,95 @@ bool server_exit_test(struct server_env *p_env)
 		}
 		return false;
 	} else {
+		DBG_PRINT("server_quit = true\n");
 		return true;
 	}
 }
 
-//==============================================================================
+
+
+
+
+// int server_accept_client(struct server_env *p_env, int clnt_skt)
+// {
+// 	p_env->h_clnt_thread = CreateThread(NULL, 0, client_thread, (LPVOID)&clnt_skt, 0, NULL);
+// 	if (!p_env->h_clnt_thread) {
+// 		PRINT_ERROR(E_WINAPI);
+// 		return E_FAILURE;
+// 	}
+
+	
+
+
+// }
+
+
+// DWORD WINAPI client_thread(LPVOID param)
+// {
+// 	ExitThread(E_SUCCESS);
+// }
+
+
+int server_accept_client(struct server_env *p_env)
+{
+	int res;
+	int clnt_skt;
+	FD_SET readfs;
+	// char buffer[100];
+
+	TIMEVAL tv = {1, 0};
+	FD_ZERO(&readfs);
+	FD_SET(p_env->serv_skt, &readfs);
+
+	/* wait for socket to be signald */
+	res = select(0, &readfs, NULL, NULL, &tv);
+	if (res == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		return E_FAILURE;
+	}
+
+	/* socket signald - accept client */
+	if (res) {
+		clnt_skt = accept(p_env->serv_skt, NULL, NULL);
+		if (clnt_skt == SOCKET_ERROR) {
+			PRINT_ERROR(E_WINSOCK);
+			return E_FAILURE;
+		}
+		DBG_PRINT("accepted new client\n");
+
+
+		// dbg
+		struct msg dbg_msg;
+		dbg_msg.param_cnt = 2;
+		dbg_msg.type = MSG_SERVER_WIN;
+		dbg_msg.param_lst[0] = "test";
+		dbg_msg.param_lst[1] = "1234";
+
+		res = send_msg(clnt_skt, &dbg_msg);
+
+
+		// memset(buffer, 0, 100);
+		// sprintf_s(buffer, 100, "this is the server");
+		// res = send(clnt_skt, buffer, strlen(buffer), 0);
+		// if (res == SOCKET_ERROR) {
+		// 	PRINT_ERROR(E_WINSOCK);
+		// 	return E_FAILURE;
+		// }
+
+		// dbg
+		res = closesocket(clnt_skt);
+		if (res == SOCKET_ERROR) {
+			PRINT_ERROR(E_WINSOCK);
+			return E_FAILURE;
+		}
+	}
+
+	return E_SUCCESS;
+}
 
 int server_cleanup(struct server_env *p_env)
 {
+	DBG_PRINT("server_cleanup\n");
 	int ret_val = E_SUCCESS;
 
 	if (p_env->olp_stdin.hEvent) {
@@ -262,8 +348,8 @@ int server_cleanup(struct server_env *p_env)
 		}
 	}
 
-	if (p_env->skt != INVALID_SOCKET) {
-		if (closesocket(p_env->skt) == SOCKET_ERROR) {
+	if (p_env->serv_skt != INVALID_SOCKET) {
+		if (closesocket(p_env->serv_skt) == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
 			ret_val = E_FAILURE;
 		}
@@ -279,166 +365,78 @@ int server_cleanup(struct server_env *p_env)
 
 //==============================================================================
 
-// int msglen(struct msg *p_msg)
-// {
-// 	int msg_len = 0;
+int msg_len(struct msg *p_msg)
+{
+	int msg_len = 0;
 	
-// 	msg_len += strlen(msg_type_2_str[p_msg->type]);
+	msg_len += strlen(msg_type_2_str[p_msg->type]);
 
-// 	if (p_msg->param_cnt) {
-// 		msg_len += 1 + (p_msg->param_cnt - 1); // ':' and ';'
-// 		for (int i = 0; i < p_msg->param_cnt; i++)
-// 			msg_len += strlen(p_msg->param_lst[i]);
-// 	}
+	if (p_msg->param_cnt) {
+		msg_len += p_msg->param_cnt;
+		for (int i = 0; i < p_msg->param_cnt; i++)
+			msg_len += strlen(p_msg->param_lst[i]);
+	}
 
-// 	return msg_len;
-// }
+	DBG_PRINT("msg_len = %d\n", msg_len);
+	return msg_len;
+}
 
-//==============================================================================
+int print_msg_2_buff(char *buff, struct msg *p_msg)
+{
+	char *str = msg_type_2_str[p_msg->type];
+	int offset = 0;
 
-// int build_msg(char *buff, struct msg *p_msg)
-// {
-// 	int offset = 0;
-// 	char *str = msg_type_2_str[p_msg->type];
+	/* copy message text into buffer */
+	memcpy(buff, str, strlen(str));
+	offset += strlen(str);
 
-// 	// copy message text into buffer
-// 	memcpy(buff, str, strlen(str));
-// 	offset += strlen(str);
+	/* copy params into buffer */
+	for (int i = 0; i < p_msg->param_cnt; i++) {
+		buff[offset++] = i ? ';' : ':';
+		str = p_msg->param_lst[i];
+		memcpy(buff + offset, str, strlen(str));
+		offset += strlen(str);
+	}
 
-// 	// copy params into buffer
-// 	for (int i = 0; i < p_msg->param_cnt; i++) {
-// 		buff[offset++] = i ? ';' : ':';
-// 		str = p_msg->param_lst[i];
-// 		memcpy(buff + offset, str, strlen(str));
-// 		offset += strlen(str);
-// 	}
+	DBG_PRINT("print_msg_2_buff: %s\n", buff);
+	return offset;
+}
 
-// 	// return buffer length
-// 	return offset;
-// }
+int send_msg(int skt, struct msg *p_msg)
+{
+	DBG_PRINT("send_msg\n");
+	char *buffer = NULL;
+	int ret_val = E_FAILURE;
+	int buff_len;
+	int res;
 
-//==============================================================================
+	/* do-while(0) for easy cleanup */
+	do {
+		/* allocate send buffer */
+		buff_len = msg_len(p_msg);
+		buffer = calloc(buff_len + 1, sizeof(*buffer)); // FIXME: +1 is temporary for debug only
+		if (buffer == NULL) {
+			PRINT_ERROR(E_STDLIB);
+			return E_FAILURE;
+		}
 
-// int server_send_msg(struct client_env *p_env, struct msg *p_msg)
-// {
-// 	PSOCKADDR p_server = (PSOCKADDR)&p_env->server;
-// 	SOCKET skt = p_env->skt;
-// 	char *buff = NULL;
-// 	int ret_val = E_SUCCESS;
-// 	int buff_len;
+		/* fill buffer with messgae */
+		print_msg_2_buff(buffer, p_msg);
 
-// 	// do-wile(0) for easy cleanup
-// 	do {
-// 		// allocate buffer for sending message
-// 		buff_len = msglen(p_msg);
-// 		if ((buff = calloc(buff_len, sizeof(*buff))) == NULL) {
-// 			PRINT_ERROR(E_STDLIB, E_MSG_NONE);
-// 			ret_val = E_FAILURE;
-// 			break;
-// 		}
+		/* send message */
+		res = send(skt, buffer, buff_len, 0);
+		if (res == SOCKET_ERROR) { // FIXME: partial send
+			PRINT_ERROR(E_WINSOCK);
+			ret_val = E_FAILURE;
+		}
 
-// 		// fill buffer with messgae
-// 		build_msg(buff, p_msg);
+		/* message has been sent */
+		ret_val = E_SUCCESS;
 
-// 		// send message // FIXME: partial send
-// 		if (sendto(p_env->skt, buff, strlen(buff), 0, p_server, sizeof(*p_server)) == SOCKET_ERROR) {
-// 			PRINT_ERROR(E_WINSOCK, E_MSG_NONE);
-// 			ret_val = E_FAILURE;
-// 		}
-// 	} while (0);
-
-// 	if (buff)
-// 		free(buff);
-
-// 	return ret_val;
-// }
-
-// //==============================================================================
-
-// int parse_buff_to_msg(char *buff, struct msg *p_msg)
-// {
-// 	char *str;
-// 	int idx;
-// 	int ret_val = E_SUCCESS;
-
-// 	// reset mssage struct
-// 	memset(p_msg, 0, sizeof(*p_msg));
-
-// 	// parse message type
-// 	for (int i = 0; i < MSG_MAX; i++) {
-// 		str = msg_type_2_str[i];
-// 		if (strncmp(str, buff, strlen(str)) == 0) {
-// 			p_msg->type = i;
-// 			break;
-// 		}
-// 	}
-
-// 	// parse params
-// 	while(str = strtok_s(buff + 1 + strlen(str), ";:", NULL)) {
-// 		idx = p_msg->param_cnt;
-// 		p_msg->param_lst[idx] = calloc(strlen(str) + 1, sizeof(char));
-// 		if (!p_msg->param_lst[idx]) {
-// 			PRINT_ERROR(E_STDLIB, E_MSG_NONE);
-// 			ret_val = E_FAILURE;
-// 			break;
-// 		}
-// 		p_msg->param_cnt++;
-// 	}
-
-// 	return ret_val;
-// }
-
-// //==============================================================================
-
-// void free_msg(struct msg **p_p_msg)
-// {
-// 	// sanity
-// 	if (!p_p_msg || !*p_p_msg)
-// 		return;
-
-// 	// free message mem
-// 	struct msg *p_msg = *p_p_msg;
-// 	for (int i = 0; i < p_msg->param_cnt; i++)
-// 		free(p_msg->param_lst[i]);
-// 	free(p_msg);
-// 	p_p_msg = NULL;
-// }
-
-// //==============================================================================
-
-// int server_recv_msg(struct client_env *p_env, struct msg *p_msg, int sec)
-// {
-// 	SOCKET skt = p_env->skt;
-// 	char buff[100]; // FIXME:
-// 	int res;
-// 	int ret_val = E_SUCCESS;
-// 	TIMEVAL time = {sec, 0};
-// 	int buff_len;
-
-// 	FD_SET(skt, &p_env->read_fds);
+	} while (0);
 	
-// 	res = select(skt + 1, &p_env->read_fds, NULL, NULL, &time);
-// 	if (!res) {
-// 		PRINT_ERR(E_INTERNAL, "select timout");
-// 		return E_FAILURE;
-// 	} else if (res == SOCKET_ERROR) {
-// 		PRINT_ERR(E_WINSOCK, E_MSG_NONE);
-// 		return E_FAILURE;
-// 	}
+	if (buffer)
+		free(buffer);
 
-// 	// recieve message // FIXME: partial recv
-// 	if (recv(p_env->skt, buff, 100, 0) == SOCKET_ERROR) {
-// 		PRINT_ERROR(E_WINSOCK, E_MSG_NONE);
-// 		return E_FAILURE;
-// 	}
-
-// 	// parse message
-// 	if (parse_buff_to_msg(buff, p_msg)) {
-// 		PRINT_ERROR(E_INTERNAL, "parse msg failure\n");
-// 		return E_FAILURE;
-// 	}
-
-// 	free(buff);
-
-// 	return ret_val;
-// }
+	return ret_val;
+}

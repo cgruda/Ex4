@@ -46,12 +46,11 @@
 #define SEC2MS               1000
 #define MIN2SEC              60
 
-// error messages
-#define E_MSG_NONE NULL
-#define E_MSG_NULL_PTR "Null Pointer"
-#define E_MSG_MAX_WAIT "Max Wait-time passed"
-#define E_MSG_BUF_FULL "Buffer is full"
-#define E_MSG_INPT_ERR "Input file has bad values"
+#define MAX_PORT             65536
+
+
+#define MAX_PLAYERS 2
+#define MAX_PARAM 4
 
 /*
  ==============================================================================
@@ -122,23 +121,37 @@ struct args
 	uint16_t server_port;
 };
 
+struct player
+{
+	int id;
+	int clnt_skt;
+	HANDLE h_thread;
+	bool wating_play;
+};
+
 struct server_env
 {
+	// input args
 	struct args args;
-	
-	// for exit sync from stdin
+	// quit server params
 	HANDLE h_file_stdin;
 	OVERLAPPED olp_stdin;
 	char buffer[7];
-
-	int skt;
-	//FD_SET read_fds;
+	// server handling params
+	int serv_skt;
 	SOCKADDR_IN server;
-	char *username;
+	// client handling
+	struct player player_db[MAX_PLAYERS];
+	int player_cnt;
+
+
+	// temp
+	HANDLE h_clnt_thread;
+
+
+	//FD_SET read_fds;
 };
 
-#define MAX_PLAYERS 2
-#define MAX_PARAM 4
 
 struct msg
 {
@@ -165,8 +178,16 @@ bool check_server_exit(HANDLE* p_h_stdin);
 int check_input(struct server_env* p_env, int argc, char** argv);
 int my_atoi(char *str, int *p_result);
 void print_error(int err_val);
-bool server_exit_test(struct server_env *p_env);
+bool server_quit(struct server_env *p_env);
 int server_init(struct server_env *p_env);
 int server_cleanup(struct server_env *p_env);
+int server_accept_client(struct server_env *p_env);
+
+
+int send_msg(int skt, struct msg *p_msg);
+int print_msg_2_buff(char *buff, struct msg *p_msg);
+int msg_len(struct msg *p_msg);
+
+
 
 #endif // __SERVER_TASKS_H__

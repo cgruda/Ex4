@@ -45,7 +45,7 @@ int main(int argc, char **argv)
 	if (check_input(&env, argc, argv))
 		return E_FAILURE;
 
-	int count = 0;
+	// int count = 0;
 
 	/* do-while(0) for easy cleanup */
 	do {
@@ -53,18 +53,21 @@ int main(int argc, char **argv)
 			break;
 
 		/* execution loop */
-		while (1) {
-			if (server_exit_test(&env))
+		while (!server_quit(&env)) {
+			
+			if(server_accept_client(&env))
 				break;
-			count++;
+			//count++;
 		}
 
 		ret_val = E_SUCCESS;
+
 	} while (0);
 
 	if (server_cleanup(&env))
 		ret_val = E_FAILURE;
 
-	printf("BYBY BIRDY count=%d\n", count);
+	//printf("BYBY BIRDY count=%d\n", count);
+	printf("--- SERVER EXIT %s ---\n", ret_val ? "FAILURE" : "SUCCESS");
 	return ret_val;
 }
