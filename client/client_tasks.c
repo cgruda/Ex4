@@ -21,25 +21,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "client_tasks.h"
-
-char *msg_type_2_str[MSG_MAX] =
-{
-	[MSG_CLIENT_REQUEST]             = "CLIENT_REQUEST",
-	[MSG_CLIENT_VERSUS]              = "CLIENT_VERSUS",
-	[MSG_CLIENT_SETUP]               = "CLIENT_SETUP",
-	[MSG_CLIENT_PLAYER_MOVE]         = "CLIENT_PLAYER_MOVE",
-	[MSG_CLIENT_DISCONNECT]          = "CLIENT_DISCONNECT",
-	[MSG_SERVER_MAIN_MENUE]          = "SERVER_MAIN_MENUE",
-	[MSG_SERVER_APPROVED]            = "SERVER_APPROVED",
-	[MSG_SERVER_DENIED]              = "SERVER_DENIED",
-	[MSG_SERVER_INVITE]              = "SERVER_INVITE",
-	[MSG_SERVER_SETUP_REQUEST]       = "SERVER_SETUP_REQUEST",
-	[MSG_SERVER_PLAYER_MOVE_REQUEST] = "SERVER_PLAYER_MOVE_REQUEST",
-	[MSG_SERVER_WIN]                 = "SERVER_WIN",
-	[MSG_SERVER_DRAW]                = "SERVER_DRAW",
-	[MSG_SERVER_NO_OPONENTS]         = "SERVER_NO_OPONENTS",
-	[MSG_SERVER_OPPONENT_QUIT]       = "SERVER_OPPONENT_QUIT"
-};
+#include "message.h"
 
 /*
  ==============================================================================
@@ -156,7 +138,7 @@ int client_init(struct client_env *p_env)
 	}
 
 	// dbg
-	struct msg *p_msg = recv_msg(p_env->cnct_skt, TIMEOUT_SEC_DEFAULT);
+	struct msg *p_msg = recv_msg(p_env->cnct_skt, MSG_TIMEOUT_SEC_DEFAULT);
 	print_msg(p_msg);
 	free_msg(&p_msg);
 
@@ -181,108 +163,4 @@ int client_cleanup(struct client_env *p_env)
 	}
 
 	return ret_val;
-}
-
-//==============================================================================
-
-struct msg *parse_buff_2_msg(char *buff)
-{
-	struct msg *p_msg = NULL;
-	char *token = NULL;
-	char *context;
-	int idx, token_len;
-
-	/* reset mssage struct */
-	p_msg = calloc(1, sizeof(*p_msg));
-	if (p_msg == NULL) {
-		PRINT_ERROR(E_STDLIB);
-		NULL;
-	}
-
-	/* parse message type */
-	token = strtok_s(buff, ":", &context);
-	for (int i = 0; i < MSG_MAX; i++) {
-		if (strcmp(token, msg_type_2_str[i]) == 0) {
-			p_msg->type = i;
-			break;
-		}
-	}
-
-	/* parse params */
-	while(token = strtok_s(NULL, ";", &context)) {
-		idx = p_msg->param_cnt;
-		token_len = strlen(token);
-		p_msg->param_lst[idx] = calloc(token_len + 1, sizeof(char));
-		if (!p_msg->param_lst[idx]) {
-			PRINT_ERROR(E_STDLIB);
-			free_msg(&p_msg);
-			return NULL;
-		}
-		memcpy(p_msg->param_lst[idx], token, token_len);
-		p_msg->param_cnt++;
-	}
-
-	return p_msg;
-}
-
-void free_msg(struct msg **p_p_msg)
-{
-	/* sanity */
-	if (!p_p_msg || !*p_p_msg)
-		return;
-
-	/* free message mem */
-	struct msg *p_msg = *p_p_msg;
-	for (int i = 0; i < p_msg->param_cnt; i++)
-		free(p_msg->param_lst[i]);
-	free(p_msg);
-	p_p_msg = NULL;
-}
-
-void print_msg(struct msg *p_msg)
-{
-	printf("\n\tmsg:\n");
-	if (!p_msg) {
-		printf("\t\tNULL\n");
-	} else {
-		printf("\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
-		for (int i = 0; i < p_msg->param_cnt; i++)
-			printf("\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
-	}
-	printf("\n");
-}
-
-struct msg *recv_msg(int skt, int timeout_sec)
-{
-	DBG_PRINT("recv_msg\n");
-	char buff[100] = {0}; // FIXME:
-	int res;
-	int ret_val = E_SUCCESS;
-	struct msg *p_msg = NULL;
-	
-	FD_SET readfs;
-	FD_ZERO(&readfs);
-	FD_SET(skt, &readfs);
-	TIMEVAL time = {timeout_sec, 0};
-
-	/* wait for message to arrive in socket */
-	res = select(0, &readfs, NULL, NULL, &time);
-	if (!res) {
-		PRINT_ERROR(E_TIMEOUT);
-		return NULL;
-	} else if (res == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		return NULL;
-	}
-
-	/* recieve message */ // FIXME: partial recv
-	res = recv(skt, buff, 100, 0);
-	if (res == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		return NULL;
-	}
-
-	/* parse message */
-	p_msg = parse_buff_2_msg(buff);
-	return p_msg;
 }

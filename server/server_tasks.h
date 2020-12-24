@@ -50,45 +50,24 @@
 
 
 #define MAX_PLAYERS 2
-#define MAX_PARAM 4
+#define MSG_MAX_PARAMS 4
 
 /*
  ==============================================================================
  * ENUMERATIONS
  ==============================================================================
  */
+
 enum err_value
 {
 	E_SUCCESS = 0,
 	E_FAILURE,
 	E_INTERNAL,
+	E_TIMEOUT,
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,
 };
-
-enum msg_type
-{
-	/* client messages */
-	MSG_CLIENT_REQUEST,
-	MSG_CLIENT_VERSUS,
-	MSG_CLIENT_SETUP,
-	MSG_CLIENT_PLAYER_MOVE,
-	MSG_CLIENT_DISCONNECT,
-	/* server messgaes */
-	MSG_SERVER_MAIN_MENUE,
-	MSG_SERVER_APPROVED,
-	MSG_SERVER_DENIED,
-	MSG_SERVER_INVITE,
-	MSG_SERVER_SETUP_REQUEST,
-	MSG_SERVER_PLAYER_MOVE_REQUEST,
-	MSG_SERVER_WIN,
-	MSG_SERVER_DRAW,
-	MSG_SERVER_NO_OPONENTS,
-	MSG_SERVER_OPPONENT_QUIT,
-	MSG_MAX
-};
-
 
 /*
  ==============================================================================
@@ -152,14 +131,6 @@ struct server_env
 	//FD_SET read_fds;
 };
 
-
-struct msg
-{
-	int type;
-	int param_cnt;
-	char *param_lst[MAX_PARAM];
-};
-
 /*
  ==============================================================================
  * DECLARATIONS
@@ -173,20 +144,15 @@ struct msg
  * @return 
  ******************************************************************************
  */
-bool check_server_exit(HANDLE* p_h_stdin);
 
 int check_input(struct server_env* p_env, int argc, char** argv);
 int my_atoi(char *str, int *p_result);
-void print_error(int err_val);
 bool server_quit(struct server_env *p_env);
 int server_init(struct server_env *p_env);
 int server_cleanup(struct server_env *p_env);
 int server_accept_client(struct server_env *p_env);
+void print_error(int err_val);
 
-
-int send_msg(int skt, struct msg *p_msg);
-int print_msg_2_buff(char *buff, struct msg *p_msg);
-int msg_len(struct msg *p_msg);
 
 
 

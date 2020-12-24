@@ -141,9 +141,11 @@
   <ItemGroup>
     <ClCompile Include="client_tasks.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="message.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client_tasks.h" />
+    <ClInclude Include="message.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -45,9 +45,6 @@
 #define MAX_USERNAME_LEN     20
 #define MAX_PORT             65536
 
-#define TIMEOUT_SEC_DEFAULT      15
-#define TIMEOUT_SEC_MAX          30
-
 // user interface prints
 #define UI_CONNECT_FAIL "Failed connecting to server on %s:%d.\n"
 #define UI_CONNECT_DENY "Server on %s:%d denied the connection request\n"
@@ -68,37 +65,13 @@
  */
 enum err_value
 {
-	// general error vals
 	E_SUCCESS = 0,
 	E_FAILURE,
-	// specific error vals
 	E_INTERNAL,
 	E_TIMEOUT,
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,
-};
-
-enum msg_type
-{
-	// cleint messages
-	MSG_CLIENT_REQUEST,
-	MSG_CLIENT_VERSUS,
-	MSG_CLIENT_SETUP,
-	MSG_CLIENT_PLAYER_MOVE,
-	MSG_CLIENT_DISCONNECT,
-	// server mesgaes
-	MSG_SERVER_MAIN_MENUE,
-	MSG_SERVER_APPROVED,
-	MSG_SERVER_DENIED,
-	MSG_SERVER_INVITE,
-	MSG_SERVER_SETUP_REQUEST,
-	MSG_SERVER_PLAYER_MOVE_REQUEST,
-	MSG_SERVER_WIN,
-	MSG_SERVER_DRAW,
-	MSG_SERVER_NO_OPONENTS,
-	MSG_SERVER_OPPONENT_QUIT,
-	MSG_MAX
 };
 
 /*
@@ -118,7 +91,6 @@ enum msg_type
 
 // print error message
 #define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
-
 
 /*
  ==============================================================================
@@ -142,15 +114,6 @@ struct client_env
 	char *username;
 };
 
-
-#define MAX_PARAM 4
-struct msg
-{
-	int type;
-	int param_cnt;
-	char *param_lst[MAX_PARAM];
-};
-
 /*
  ==============================================================================
  * DECLARATIONS
@@ -168,10 +131,8 @@ struct msg
 int check_input(struct client_env *p_env, int argc, char** argv);
 int client_init(struct client_env *p_env);
 int client_cleanup(struct client_env *p_env);
-void print_msg(struct msg *p_msg);
-void free_msg(struct msg **p_p_msg);
-struct msg *parse_buff_2_msg(char *buff);
-struct msg *recv_msg(int skt, int timeout_sec);
+void print_error(int err_val);
+
 
 
 #endif // __CLIENT_TASKS_H__

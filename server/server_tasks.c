@@ -24,25 +24,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "server_tasks.h"
-
-char *msg_type_2_str[MSG_MAX] =
-{
-	[MSG_CLIENT_REQUEST]             = "CLIENT_REQUEST",
-	[MSG_CLIENT_VERSUS]              = "CLIENT_VERSUS",
-	[MSG_CLIENT_SETUP]               = "CLIENT_SETUP",
-	[MSG_CLIENT_PLAYER_MOVE]         = "CLIENT_PLAYER_MOVE",
-	[MSG_CLIENT_DISCONNECT]          = "CLIENT_DISCONNECT",
-	[MSG_SERVER_MAIN_MENUE]          = "SERVER_MAIN_MENUE",
-	[MSG_SERVER_APPROVED]            = "SERVER_APPROVED",
-	[MSG_SERVER_DENIED]              = "SERVER_DENIED",
-	[MSG_SERVER_INVITE]              = "SERVER_INVITE",
-	[MSG_SERVER_SETUP_REQUEST]       = "SERVER_SETUP_REQUEST",
-	[MSG_SERVER_PLAYER_MOVE_REQUEST] = "SERVER_PLAYER_MOVE_REQUEST",
-	[MSG_SERVER_WIN]                 = "SERVER_WIN",
-	[MSG_SERVER_DRAW]                = "SERVER_DRAW",
-	[MSG_SERVER_NO_OPONENTS]         = "SERVER_NO_OPONENTS",
-	[MSG_SERVER_OPPONENT_QUIT]       = "SERVER_OPPONENT_QUIT"
-};
+#include "message.h"
 
 /*
  ==============================================================================
@@ -78,7 +60,7 @@ void print_error(int err_val)
 {
 	printf("Error: ");
 
-	// print relevant error
+	/* print relevant error */
 	switch (err_val) {
 	case E_STDLIB:
 		printf("errno = %d\n", errno);
@@ -91,6 +73,9 @@ void print_error(int err_val)
 		break;
 	case E_INTERNAL:
 		printf("Internal Error\n");
+		break;
+	case E_TIMEOUT:
+		printf("Timeout Error\n");
 		break;
 	default:
 		printf("Unknown Error\n");
@@ -299,7 +284,6 @@ int server_accept_client(struct server_env *p_env)
 		}
 		DBG_PRINT("accepted new client\n");
 
-
 		// dbg
 		struct msg dbg_msg;
 		dbg_msg.param_cnt = 2;
@@ -359,84 +343,6 @@ int server_cleanup(struct server_env *p_env)
 		PRINT_ERROR(E_WINSOCK);
 		ret_val = E_FAILURE;
 	}
-
-	return ret_val;
-}
-
-//==============================================================================
-
-int msg_len(struct msg *p_msg)
-{
-	int msg_len = 0;
-	
-	msg_len += strlen(msg_type_2_str[p_msg->type]);
-
-	if (p_msg->param_cnt) {
-		msg_len += p_msg->param_cnt;
-		for (int i = 0; i < p_msg->param_cnt; i++)
-			msg_len += strlen(p_msg->param_lst[i]);
-	}
-
-	DBG_PRINT("msg_len = %d\n", msg_len);
-	return msg_len;
-}
-
-int print_msg_2_buff(char *buff, struct msg *p_msg)
-{
-	char *str = msg_type_2_str[p_msg->type];
-	int offset = 0;
-
-	/* copy message text into buffer */
-	memcpy(buff, str, strlen(str));
-	offset += strlen(str);
-
-	/* copy params into buffer */
-	for (int i = 0; i < p_msg->param_cnt; i++) {
-		buff[offset++] = i ? ';' : ':';
-		str = p_msg->param_lst[i];
-		memcpy(buff + offset, str, strlen(str));
-		offset += strlen(str);
-	}
-
-	DBG_PRINT("print_msg_2_buff: %s\n", buff);
-	return offset;
-}
-
-int send_msg(int skt, struct msg *p_msg)
-{
-	DBG_PRINT("send_msg\n");
-	char *buffer = NULL;
-	int ret_val = E_FAILURE;
-	int buff_len;
-	int res;
-
-	/* do-while(0) for easy cleanup */
-	do {
-		/* allocate send buffer */
-		buff_len = msg_len(p_msg);
-		buffer = calloc(buff_len + 1, sizeof(*buffer)); // FIXME: +1 is temporary for debug only
-		if (buffer == NULL) {
-			PRINT_ERROR(E_STDLIB);
-			return E_FAILURE;
-		}
-
-		/* fill buffer with messgae */
-		print_msg_2_buff(buffer, p_msg);
-
-		/* send message */
-		res = send(skt, buffer, buff_len, 0);
-		if (res == SOCKET_ERROR) { // FIXME: partial send
-			PRINT_ERROR(E_WINSOCK);
-			ret_val = E_FAILURE;
-		}
-
-		/* message has been sent */
-		ret_val = E_SUCCESS;
-
-	} while (0);
-	
-	if (buffer)
-		free(buffer);
 
 	return ret_val;
 }
