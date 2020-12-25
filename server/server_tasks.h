@@ -64,6 +64,7 @@ enum err_value
 	E_FAILURE,
 	E_INTERNAL,
 	E_TIMEOUT,
+        E_MESSAGE,
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,

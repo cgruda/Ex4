@@ -36,6 +36,8 @@ int main(int argc, char **argv)
 {
 	struct client_env env = {0};
 	int ret_val = E_SUCCESS;
+	int res;
+	int user_input;
 
 	if (check_input(&env, argc, argv))
 		return E_FAILURE;
@@ -45,6 +47,22 @@ int main(int argc, char **argv)
 		if(client_init(&env))
 			break;
 
+		while(1) {
+			res = cilent_connect_to_game(&env);
+			if (res == S_CONNECT_SUCCESS) {
+				break;
+			} else if (res== S_CONNECT_FAILURE) {
+				UI_PRINT(UI_MENU_CONNECT);
+				scanf_s("%d", &user_input);
+				if (user_input == 1)
+					continue;
+				else
+					break;
+			} else {
+				DBG_PRINT("what to do???\n");
+				break;
+			}
+		}
 
 	} while (0);
 

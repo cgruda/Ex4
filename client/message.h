@@ -32,8 +32,10 @@
 
 enum msg_type
 {
+	MSG_INVALID,
+	MSG_MIN,
 	/* client messages */
-	MSG_CLIENT_REQUEST,
+	MSG_CLIENT_REQUEST = MSG_MIN,
 	MSG_CLIENT_VERSUS,
 	MSG_CLIENT_SETUP,
 	MSG_CLIENT_PLAYER_MOVE,
@@ -81,6 +83,16 @@ void print_msg(struct msg *p_msg);
 
 /**
  ******************************************************************************
+ * @brief allocate new message and set params
+ * @param type of message
+ * @param p0-p3 pointers to param0-3 strings
+ * @return pointer to new allocated message, NULL on failure
+ ******************************************************************************
+ */
+struct msg *new_message(int type, char *p0, char *p1, char *p2, char *p3);
+
+/**
+ ******************************************************************************
  * @brief free message allocated memory
  * @param p_p_msg pointer to message pointer, message pointer is set to NULL
  ******************************************************************************
@@ -100,11 +112,16 @@ int send_msg(int skt, struct msg *p_msg);
 /**
  ******************************************************************************
  * @brief recieve message on socket
+ * @param p_p_msg pointer to message pointer to hold recieved message,
  * @param skt socket
  * @param timout_sec maximum time in seconds to wait for message to arrive
- * @return pointer to allocated message, NULL on error or timeout
+ * @return E_SUCESS  - all good                - need to free msg
+ *         E_MESSAGE - message was corrupted   - no need to free msg
+ *         E_TIMEOUT - timeout waiting for msg - no need to free msg
+ *         E_STDLIB  - mem error               - no need to free msg
+ *         E_WINSOCK - socket error            - no need to free msg
  ******************************************************************************
  */
-struct msg *recv_msg(int skt, int timeout_sec);
+int recv_msg(struct msg **p_p_msg, int skt, int timeout_sec);
 
 #endif // __MESSAGES_H__

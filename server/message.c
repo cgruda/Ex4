@@ -101,42 +101,101 @@ int print_msg_2_buff(char *buff, struct msg *p_msg)
 	return offset;
 }
 
-struct msg *parse_buff_2_msg(char *buff)
+int new_msg_param(char **p_param_dst, char *param_src)
+{
+	if (!param_src)
+		return E_SUCCESS;
+	
+	int mem_size = strlen(param_src) + 1;
+
+	*p_param_dst = calloc(mem_size, sizeof(char));
+	if (!*p_param_dst) {
+		PRINT_ERROR(E_STDLIB);
+		return E_STDLIB;
+	}
+
+	memcpy(*p_param_dst, param_src, mem_size - 1);
+
+	return E_SUCCESS;
+}
+
+int parse_buff_2_msg(char *buff, struct msg **p_p_msg)
 {
 	struct msg *p_msg = NULL;
 	char *token = NULL;
-	char *context;
-	int idx, token_len;
+	char *context = NULL;
+	int idx, res = E_SUCCESS;
+
+	*p_p_msg = NULL;
 
 	/* reset mssage struct */
 	p_msg = calloc(1, sizeof(*p_msg));
 	if (p_msg == NULL) {
 		PRINT_ERROR(E_STDLIB);
-		NULL;
+		return E_STDLIB;
 	}
 
 	/* parse message type */
+	p_msg->type = MSG_INVALID;
 	token = strtok_s(buff, ":", &context);
-	for (int i = 0; i < MSG_MAX; i++) {
+	for (int i = MSG_MIN; i < MSG_MAX; i++) {
 		if (strcmp(token, msg_type_2_str[i]) == 0) {
 			p_msg->type = i;
 			break;
 		}
 	}
 
+	/* corrupt message */
+	if (p_msg->type == MSG_INVALID) {
+		free(&p_msg);
+		return E_MESSAGE;
+	}
+
 	/* parse params */
 	while(token = strtok_s(NULL, ";", &context)) {
 		idx = p_msg->param_cnt;
-		token_len = strlen(token);
-		p_msg->param_lst[idx] = calloc(token_len + 1, sizeof(char));
-		if (!p_msg->param_lst[idx]) {
-			PRINT_ERROR(E_STDLIB);
+		res = new_msg_param(&p_msg->param_lst[idx], token);
+		if (res != E_SUCCESS) {
 			free_msg(&p_msg);
-			return NULL;
+			return res;
 		}
-		memcpy(p_msg->param_lst[idx], token, token_len);
 		p_msg->param_cnt++;
 	}
+
+	*p_p_msg = p_msg;
+
+	return E_SUCCESS;
+}
+
+struct msg *new_message(int type, char *p0, char *p1, char *p2, char *p3)
+{
+	struct msg *p_msg = NULL;
+	char *param_lst   = NULL;
+	int res = E_SUCCESS;
+
+	/* allocate message */
+	p_msg = calloc(1, sizeof(*p_msg));
+	if (p_msg == NULL) {
+		PRINT_ERROR(E_STDLIB);
+		return NULL;
+	}
+
+	/* set message type */
+	p_msg->type = type;
+
+	/* set message params */
+	res |= new_msg_param(&p_msg->param_lst[0], p0);
+	res |= new_msg_param(&p_msg->param_lst[1], p1);
+	res |= new_msg_param(&p_msg->param_lst[2], p2);
+	res |= new_msg_param(&p_msg->param_lst[3], p3);
+
+	if (res != E_SUCCESS) {
+		free(&p_msg);
+		return NULL;
+	}
+
+	/* set params count */
+	for(; p_msg->param_lst[p_msg->type]; p_msg->type++);
 
 	return p_msg;
 }
@@ -186,6 +245,7 @@ int send_msg(int skt, struct msg *p_msg)
 		buffer = calloc(buff_len + 1, sizeof(*buffer)); // FIXME: +1 is temporary for debug only
 		if (buffer == NULL) {
 			PRINT_ERROR(E_STDLIB);
+			ret_val = E_STDLIB;
 			break;
 		}
 
@@ -196,6 +256,7 @@ int send_msg(int skt, struct msg *p_msg)
 		res = send(skt, buffer, buff_len, 0);
 		if (res == SOCKET_ERROR) { // FIXME: partial send
 			PRINT_ERROR(E_WINSOCK);
+			ret_val = E_WINSOCK;
 			break;
 		}
 
@@ -211,13 +272,11 @@ int send_msg(int skt, struct msg *p_msg)
 	return ret_val;
 }
 
-struct msg *recv_msg(int skt, int timeout_sec)
+int recv_msg(struct msg **p_p_msg, int skt, int timeout_sec)
 {
-	DBG_PRINT("recv_msg\n");
 	char buff[100] = {0}; // FIXME:
 	int res;
 	int ret_val = E_SUCCESS;
-	struct msg *p_msg = NULL;
 	
 	FD_SET readfs;
 	FD_ZERO(&readfs);
@@ -228,20 +287,21 @@ struct msg *recv_msg(int skt, int timeout_sec)
 	res = select(0, &readfs, NULL, NULL, &time);
 	if (!res) {
 		PRINT_ERROR(E_TIMEOUT);
-		return NULL;
+		return E_TIMEOUT;
 	} else if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
-		return NULL;
+		return E_WINSOCK;
 	}
 
 	/* recieve message */ // FIXME: partial recv
 	res = recv(skt, buff, 100, 0);
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
-		return NULL;
+		return E_WINSOCK;
 	}
 
 	/* parse message */
-	p_msg = parse_buff_2_msg(buff);
-	return p_msg;
+	res = parse_buff_2_msg(buff, p_p_msg);
+
+	return res;
 }

@@ -77,6 +77,9 @@ void print_error(int err_val)
 	case E_TIMEOUT:
 		printf("Timeout Error\n");
 		break;
+	case E_MESSAGE:
+		printf("Message Error\n");
+		break;
 	default:
 		printf("Unknown Error\n");
 	}

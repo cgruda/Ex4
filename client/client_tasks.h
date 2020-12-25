@@ -46,6 +46,7 @@
 #define MAX_PORT             65536
 
 // user interface prints
+#define UI_CONNECT_PRE  "Connected to server on %s:%d\n"
 #define UI_CONNECT_FAIL "Failed connecting to server on %s:%d.\n"
 #define UI_CONNECT_DENY "Server on %s:%d denied the connection request\n"
 #define UI_GAME_START   "Game is on!\n"
@@ -58,20 +59,31 @@
 #define UI_MENU_CONNECT "Choose what to do next:\n" "1. Try to reconnect\n" "2. Exit\n"
 #define UI_MENU_PALY    "Choose what to do next:\n" "1. Play against another client\n" "2. Quit\n"
 
+#define UI_PRINT        printf_s
+
 /*
  ==============================================================================
  * ENUMERATIONS
  ==============================================================================
  */
-enum err_value
+enum err_val
 {
 	E_SUCCESS = 0,
 	E_FAILURE,
 	E_INTERNAL,
 	E_TIMEOUT,
+	E_MESSAGE,
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,
+	E_MAX
+};
+
+enum status_val
+{
+	S_CONNECT_FAILURE = E_MAX,
+	S_CONNECT_SUCCESS,
+	S_UNDEFINED_STATE,
 };
 
 /*
@@ -132,6 +144,7 @@ int check_input(struct client_env *p_env, int argc, char** argv);
 int client_init(struct client_env *p_env);
 int client_cleanup(struct client_env *p_env);
 void print_error(int err_val);
+int cilent_connect_to_game(struct client_env *p_env);
 
 
 

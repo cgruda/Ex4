@@ -52,6 +52,9 @@ void print_error(int err_val)
 	case E_INTERNAL:
 		printf("Internal Error\n");
 		break;
+	case E_MESSAGE:
+		printf("Message Error\n");
+		break;
 	case E_TIMEOUT:
 		printf("Timeout Error\n");
 		break;
@@ -115,14 +118,14 @@ int client_init(struct client_env *p_env)
 	res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
 	if (res) {
 		printf("Error: WSAStartup returnd with code 0x%X\n", res);
-		return E_FAILURE;
+		return E_WINSOCK;
 	}
 
 	/* socket for connection with server */
 	p_env->cnct_skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (p_env->cnct_skt == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
-		return E_FAILURE;
+		return E_WINSOCK;
 	}
 
 	/* set server addres */
@@ -130,19 +133,70 @@ int client_init(struct client_env *p_env)
 	p_env->server.sin_addr.s_addr = inet_addr(p_env->args.serv_ip);
 	p_env->server.sin_port        = htons(p_env->args.serv_port);
 
+	return E_SUCCESS;
+}
+
+int cilent_connect_to_game(struct client_env *p_env)
+{
+	struct msg *p_msg_tx = NULL;
+	struct msg *p_msg_rx = NULL;
+	int res;
+	
 	/* connect socket with server */
 	res = connect(p_env->cnct_skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
 	if(res == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		return E_FAILURE;
+		UI_PRINT(UI_CONNECT_FAIL, p_env->args.serv_ip, p_env->args.serv_port);
+		return S_CONNECT_FAILURE;
+		// PRINT_ERROR(E_WINSOCK);
+		// return E_WINSOCK;
 	}
 
-	// dbg
-	struct msg *p_msg = recv_msg(p_env->cnct_skt, MSG_TIMEOUT_SEC_DEFAULT);
-	print_msg(p_msg);
-	free_msg(&p_msg);
+	UI_PRINT(UI_CONNECT_PRE, p_env->args.serv_ip, p_env->args.serv_port);
 
-	return E_SUCCESS;
+	/* create client_request */
+	p_msg_tx = new_message(MSG_CLIENT_REQUEST, p_env->username, NULL, NULL, NULL);
+	if (p_msg_tx == NULL)
+		return E_STDLIB;
+
+	/* send client request */
+	res = send_msg(p_env->cnct_skt, p_msg_tx);
+	if (res != E_SUCCESS) {
+		free_msg(&p_msg_tx);
+		return res;
+	}
+	free_msg(&p_msg_tx);
+	
+	/* recieve server answer */
+	res = recv_msg(&p_msg_rx, p_env->cnct_skt, MSG_TIMEOUT_SEC_DEFAULT);
+	switch (res) {
+	case E_SUCCESS:
+		break;
+	case E_TIMEOUT:
+		UI_PRINT(UI_CONNECT_FAIL, p_env->args.serv_ip, p_env->args.serv_port);
+		return S_CONNECT_FAILURE;
+	default:
+		return res;
+	}
+
+	/* interpet server response */
+	switch (p_msg_rx->type)
+	{
+	case MSG_SERVER_APPROVED:
+		res = S_CONNECT_SUCCESS;
+		break;
+	case MSG_SERVER_DENIED:
+		UI_PRINT(UI_CONNECT_DENY, p_env->args.serv_ip, p_env->args.serv_port);
+		res = S_CONNECT_FAILURE;
+
+		break;
+	default:
+		res = S_UNDEFINED_STATE;
+		break;
+	}
+
+	free(p_msg_rx);
+
+	return res;
 }
 
 int client_cleanup(struct client_env *p_env)
@@ -153,13 +207,13 @@ int client_cleanup(struct client_env *p_env)
 	if (p_env->cnct_skt != INVALID_SOCKET) {
 		if (closesocket(p_env->cnct_skt) == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
-			ret_val = E_FAILURE;
+			ret_val = E_WINSOCK;
 		}
 	}
 
 	if (WSACleanup()) {
 		PRINT_ERROR(E_WINSOCK);
-		ret_val = E_FAILURE;
+		ret_val = E_WINSOCK;
 	}
 
 	return ret_val;
