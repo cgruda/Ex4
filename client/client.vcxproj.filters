@@ -24,12 +24,18 @@
     <ClCompile Include="message.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="client_flow.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="client_tasks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="message.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client_flow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

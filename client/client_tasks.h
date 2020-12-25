@@ -17,6 +17,7 @@
  * INCLUDES
  ==============================================================================
  */
+
 #include <windows.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,44 +29,18 @@
  * DEFINES
  ==============================================================================
  */
-// debug prints enable
-#define DBG_ENABLE     1
 
-// input arguments count
-#define ARGC           4
-
-// for debug use
-#define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
-
-// wating times
-#define MAX_WAIT_TIME_ALL_MS (10 * MIN2SEC * SEC2MS)
-#define SEC2MS               1000
-#define MIN2SEC              60
-
+#define DBG_ENABLE           1
+#define ARGC                 4
 #define MAX_USERNAME_LEN     20
 #define MAX_PORT             65536
-
-// user interface prints
-#define UI_CONNECT_PRE  "Connected to server on %s:%d\n"
-#define UI_CONNECT_FAIL "Failed connecting to server on %s:%d.\n"
-#define UI_CONNECT_DENY "Server on %s:%d denied the connection request\n"
-#define UI_GAME_START   "Game is on!\n"
-#define UI_GAME_CHOOSE  "Choose your 4 digits:\n"
-#define UI_GAME_GUESS   "Choose your guess:\n"
-#define UI_GAME_STAGE   "Bulls: %d\n" "Cows: %d\n" "%s played: %d\n"
-#define UI_GAME_WIN     "%s won!\n" "opponent number was %d\n"
-#define UI_GAME_DRAW    "It's a tie\n"
-#define UI_GAME_STOP    "Opponent quit\n"
-#define UI_MENU_CONNECT "Choose what to do next:\n" "1. Try to reconnect\n" "2. Exit\n"
-#define UI_MENU_PALY    "Choose what to do next:\n" "1. Play against another client\n" "2. Quit\n"
-
-#define UI_PRINT        printf_s
 
 /*
  ==============================================================================
  * ENUMERATIONS
  ==============================================================================
  */
+
 enum err_val
 {
 	E_SUCCESS = 0,
@@ -73,17 +48,11 @@ enum err_val
 	E_INTERNAL,
 	E_TIMEOUT,
 	E_MESSAGE,
+	E_INPUT,
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,
 	E_MAX
-};
-
-enum status_val
-{
-	S_CONNECT_FAILURE = E_MAX,
-	S_CONNECT_SUCCESS,
-	S_UNDEFINED_STATE,
 };
 
 /*
@@ -92,17 +61,22 @@ enum status_val
  ==============================================================================
  */
 // debug stamp [file;line]
-#define DBG_STAMP()     printf("[%-9s;%-3d] ", __FILENAME__, __LINE__)
+#define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+
+#define DBG_STAMP()     printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
+
+// print error message
+#define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
 
 // for debuging
 #if DBG_ENABLE
 #define DBG_PRINT(...)  do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
+#define DBG_FUNC_STAMP()  do {DBG_STAMP(); printf("$$$ %s\n", __func__);} while (0)
+
 #else
 #define DBG_PRINT(...)
+#define DBG_FUNC_STAMP()
 #endif
-
-// print error message
-#define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
 
 /*
  ==============================================================================
@@ -110,20 +84,15 @@ enum status_val
  ==============================================================================
  */
 
-struct args
-{
-	char *serv_ip;
-	uint16_t serv_port;
-	char *user_name;
-};
-
 struct client_env
 {
-	struct args args;
-	int cnct_skt;
-	FD_SET read_fds;
+	char  *serv_ip;
+	unsigned short serv_port;
+	char  *username;
+
+	int skt;
 	SOCKADDR_IN server;
-	char *username;
+	int last_error;
 };
 
 /*
@@ -134,18 +103,53 @@ struct client_env
 
 /**
  ******************************************************************************
- * @brief 
- * @param 
- * @param 
- * @return 
+ * @brief print error message to stdin
+ * @param err_val (enum err_val)
+ ******************************************************************************
+ */
+void print_error(int err_val);
+
+/**
+ ******************************************************************************
+ * @brief check input arguments to program, and set env struct
+ * @param p_env pointer to env
+ * @param argc from main
+ * @param argv from main
+ * @return E_SUCCESS or E_FAILURE
  ******************************************************************************
  */
 int check_input(struct client_env *p_env, int argc, char** argv);
+
+/**
+ ******************************************************************************
+ * @brief initialize client resources
+ * @param p_env pointer to env
+ * @return STATE_EXIT on failure, STATE_CONNECT_ATTEMPT on success
+ ******************************************************************************
+ */
 int client_init(struct client_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief check input arguments to program, and set env struct
+ * @param p_env pointer to env
+ * @return err_val on error, (p_env->last_error) on success
+ ******************************************************************************
+ */
 int client_cleanup(struct client_env *p_env);
-void print_error(int err_val);
-int cilent_connect_to_game(struct client_env *p_env);
 
-
+/**
+ ******************************************************************************
+ * @brief wrapper for creating and sending a message from the client
+ * @param p_env pointer to client env
+ * @param type of message to be sent
+ * @param param to be sent (client sends single parameter)
+ * @return E_SUCCESS - all good
+ *         E_FAILURE - bad input to function
+ *         E_STDLIB  - mem allocation error
+ *         E_WINSOCK - socket error
+ ******************************************************************************
+ */
+int cilent_send_msg(struct client_env *p_env, int type, char *param);
 
 #endif // __CLIENT_TASKS_H__

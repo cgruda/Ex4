@@ -9,22 +9,15 @@
  *     Nir Beiber
  */
 
-#pragma comment(lib, "ws2_32.lib")
-
 /*
  ==============================================================================
  * INCLUDES
  ==============================================================================
  */
 
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdbool.h>
-#include <process.h>
-#include "winsock2.h"
 #include "client_tasks.h"
+#include "client_flow.h"
 
 /*
  ==============================================================================
@@ -35,40 +28,25 @@
 int main(int argc, char **argv)
 {
 	struct client_env env = {0};
-	int ret_val = E_SUCCESS;
-	int res;
-	int user_input;
+	int ret_val, state;
 
-	if (check_input(&env, argc, argv))
+	/* check program input arguments */
+	if (check_input(&env, argc, argv) != E_SUCCESS)
 		return E_FAILURE;
 
-	/* do-while(0) for easy cleanup */
-	do {
-		if(client_init(&env))
-			break;
+	/* initialize client resources */
+	state = client_init(&env);
 
-		while(1) {
-			res = cilent_connect_to_game(&env);
-			if (res == S_CONNECT_SUCCESS) {
-				break;
-			} else if (res== S_CONNECT_FAILURE) {
-				UI_PRINT(UI_MENU_CONNECT);
-				scanf_s("%d", &user_input);
-				if (user_input == 1)
-					continue;
-				else
-					break;
-			} else {
-				DBG_PRINT("what to do???\n");
-				break;
-			}
-		}
+	/* client execution loop */
+	while (state != STATE_EXIT)
+	{
+		state = (*clnt_flow[state])(&env);
+	}
 
-	} while (0);
+	/* free client resources */
+	ret_val = client_cleanup(&env);
 
-	if (client_cleanup(&env))
-		ret_val = E_FAILURE;
-
-	printf("--- CLIENT EXIT %s ---\n", ret_val ? "FAILURE" : "SUCCESS");
+	/* exit program */
+	printf("--- CLIENT EXIT 0x%x ---\n", ret_val);
 	return ret_val;
 }

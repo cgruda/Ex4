@@ -288,29 +288,25 @@ int server_accept_client(struct server_env *p_env)
 		DBG_PRINT("accepted new client\n");
 
 		// dbg
-		struct msg dbg_msg;
-		dbg_msg.param_cnt = 2;
-		dbg_msg.type = MSG_SERVER_WIN;
-		dbg_msg.param_lst[0] = "test";
-		dbg_msg.param_lst[1] = "1234";
+		struct msg *p_dbg_msg = new_message(MSG_SERVER_APPROVED, "test", "1234", NULL, NULL);
+		if (!p_dbg_msg) {
+			PRINT_ERROR(E_INTERNAL);
+			return E_FAILURE;
+		}
 
-		res = send_msg(clnt_skt, &dbg_msg);
+		// dbg
+		res = send_msg(clnt_skt, &p_dbg_msg);
+		if (res != E_SUCCESS) {
+			PRINT_ERROR(E_INTERNAL);
+			return E_FAILURE;
+		}
 
-
-		// memset(buffer, 0, 100);
-		// sprintf_s(buffer, 100, "this is the server");
-		// res = send(clnt_skt, buffer, strlen(buffer), 0);
+		// // dbg
+		// res = closesocket(clnt_skt);
 		// if (res == SOCKET_ERROR) {
 		// 	PRINT_ERROR(E_WINSOCK);
 		// 	return E_FAILURE;
 		// }
-
-		// dbg
-		res = closesocket(clnt_skt);
-		if (res == SOCKET_ERROR) {
-			PRINT_ERROR(E_WINSOCK);
-			return E_FAILURE;
-		}
 	}
 
 	return E_SUCCESS;

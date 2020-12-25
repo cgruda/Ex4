@@ -78,9 +78,11 @@ enum err_value
 // debug stamp [file;line]
 #define DBG_STAMP()     printf("[%-9s;%-3d] ", __FILENAME__, __LINE__)
 
+
 // for debuging
 #if DBG_ENABLE
 #define DBG_PRINT(...)  do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
+#define DBG_FUNC_STAMP()  do {DBG_STAMP(); printf("$$$ %s\n", __func__);} while (0)
 #else
 #define DBG_PRINT(...)
 #endif

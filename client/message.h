@@ -20,6 +20,7 @@
  ==============================================================================
  */
 
+#define MSG_TIMEOUT_INFINITE         -1
 #define MSG_TIMEOUT_SEC_DEFAULT      15
 #define MSG_TIMEOUT_SEC_MAX          30
 #define MSG_MAX_PARAMS               4
@@ -104,10 +105,13 @@ void free_msg(struct msg **p_p_msg);
  * @brief send message on socket
  * @param skt socket
  * @param p_msg pointer to message struct
- * @return err_value code
+ * @return E_SUCCESS - all good
+ *         E_FAILURE - bad input to function
+ *         E_STDLIB  - mem allocation error
+ *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int send_msg(int skt, struct msg *p_msg);
+int send_msg(int skt, struct msg **p_p_msg);
 
 /**
  ******************************************************************************

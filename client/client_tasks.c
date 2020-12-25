@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "client_tasks.h"
+#include "client_flow.h"
 #include "message.h"
 
 /*
@@ -55,17 +56,20 @@ void print_error(int err_val)
 	case E_MESSAGE:
 		printf("Message Error\n");
 		break;
+	case E_INPUT:
+		printf("Input Error\n");
+		break;
 	case E_TIMEOUT:
 		printf("Timeout Error\n");
 		break;
 	default:
-		printf("Unknown Error\n");
+		printf("Unknown Error 0x%02X\n", err_val);
 	}
 }
 
 int check_input(struct client_env *p_env, int argc, char** argv)
 {
-	struct args *p_args = &p_env->args;
+	DBG_FUNC_STAMP();
 	int ret_val = E_SUCCESS, res;
 	int port;
 
@@ -80,7 +84,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 		printf("\n%s is not a valid ip addres", argv[1]);
 		ret_val = E_FAILURE;
 	}
-	p_args->serv_ip = argv[1];
+	p_env->serv_ip = argv[1];
 
 	/* check port number */
 	port = strtol(argv[2], NULL, 10);
@@ -88,7 +92,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 		printf("\n%s is not a valid port", argv[2]);
 		ret_val = E_FAILURE;
 	}
-	p_args->serv_port = port;
+	p_env->serv_port = port;
 
 	/* check user name*/
 	res = strlen(argv[3]) <= MAX_USERNAME_LEN;
@@ -96,11 +100,11 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 		res = (isdigit(*c) || (isalpha(*c)));
 	if (!res) {
 		printf("\n'%s' is not a valid username. must contain numbers "
-		       "and letters only, and be up to %d charachters long",
+		       "and letters only, and be up to %d charachters long\n",
 		        argv[3], MAX_USERNAME_LEN);
 		ret_val = E_FAILURE;
 	}
-	p_args->user_name = argv[3];
+	p_env->username = argv[3];
 
 	if (ret_val != E_SUCCESS)
 		print_usage();
@@ -110,7 +114,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 
 int client_init(struct client_env *p_env)
 {
-	DBG_PRINT("client_init\n");
+	DBG_FUNC_STAMP();
 	WSADATA	wsa_data;
 	int res;
 
@@ -118,94 +122,48 @@ int client_init(struct client_env *p_env)
 	res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
 	if (res) {
 		printf("Error: WSAStartup returnd with code 0x%X\n", res);
-		return E_WINSOCK;
-	}
-
-	/* socket for connection with server */
-	p_env->cnct_skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (p_env->cnct_skt == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		return E_WINSOCK;
+		p_env->last_error = E_WINSOCK;
+		return STATE_EXIT;
 	}
 
 	/* set server addres */
+	p_env->skt                    = INVALID_SOCKET;
 	p_env->server.sin_family      = AF_INET;
-	p_env->server.sin_addr.s_addr = inet_addr(p_env->args.serv_ip);
-	p_env->server.sin_port        = htons(p_env->args.serv_port);
+	p_env->server.sin_addr.s_addr = inet_addr(p_env->serv_ip);
+	p_env->server.sin_port        = htons(p_env->serv_port);
 
-	return E_SUCCESS;
+	return STATE_CONNECT_ATTEMPT;
 }
 
-int cilent_connect_to_game(struct client_env *p_env)
+
+// client send message wrapper
+int cilent_send_msg(struct client_env *p_env, int type, char *param)
 {
-	struct msg *p_msg_tx = NULL;
-	struct msg *p_msg_rx = NULL;
+	DBG_FUNC_STAMP();
+	struct msg *p_msg = NULL;
 	int res;
-	
-	/* connect socket with server */
-	res = connect(p_env->cnct_skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
-	if(res == SOCKET_ERROR) {
-		UI_PRINT(UI_CONNECT_FAIL, p_env->args.serv_ip, p_env->args.serv_port);
-		return S_CONNECT_FAILURE;
-		// PRINT_ERROR(E_WINSOCK);
-		// return E_WINSOCK;
-	}
 
-	UI_PRINT(UI_CONNECT_PRE, p_env->args.serv_ip, p_env->args.serv_port);
-
-	/* create client_request */
-	p_msg_tx = new_message(MSG_CLIENT_REQUEST, p_env->username, NULL, NULL, NULL);
-	if (p_msg_tx == NULL)
+	/* create message */
+	p_msg = new_message(type, param, NULL, NULL, NULL);
+	if (p_msg == NULL)
 		return E_STDLIB;
 
-	/* send client request */
-	res = send_msg(p_env->cnct_skt, p_msg_tx);
-	if (res != E_SUCCESS) {
-		free_msg(&p_msg_tx);
-		return res;
-	}
-	free_msg(&p_msg_tx);
-	
-	/* recieve server answer */
-	res = recv_msg(&p_msg_rx, p_env->cnct_skt, MSG_TIMEOUT_SEC_DEFAULT);
-	switch (res) {
-	case E_SUCCESS:
-		break;
-	case E_TIMEOUT:
-		UI_PRINT(UI_CONNECT_FAIL, p_env->args.serv_ip, p_env->args.serv_port);
-		return S_CONNECT_FAILURE;
-	default:
-		return res;
-	}
+	/* send message */
+	res = send_msg(p_env->skt, &p_msg);
 
-	/* interpet server response */
-	switch (p_msg_rx->type)
-	{
-	case MSG_SERVER_APPROVED:
-		res = S_CONNECT_SUCCESS;
-		break;
-	case MSG_SERVER_DENIED:
-		UI_PRINT(UI_CONNECT_DENY, p_env->args.serv_ip, p_env->args.serv_port);
-		res = S_CONNECT_FAILURE;
-
-		break;
-	default:
-		res = S_UNDEFINED_STATE;
-		break;
-	}
-
-	free(p_msg_rx);
+	/* free message */
+	free_msg(&p_msg);
 
 	return res;
 }
 
 int client_cleanup(struct client_env *p_env)
 {
-	DBG_PRINT("client_cleanup\n");
-	int ret_val = E_SUCCESS;
+	DBG_FUNC_STAMP();
+	int ret_val = p_env->last_error;
 
-	if (p_env->cnct_skt != INVALID_SOCKET) {
-		if (closesocket(p_env->cnct_skt) == SOCKET_ERROR) {
+	if (p_env->skt != INVALID_SOCKET) {
+		if (closesocket(p_env->skt) == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
 			ret_val = E_WINSOCK;
 		}

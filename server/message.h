@@ -101,13 +101,13 @@ void free_msg(struct msg **p_p_msg);
 
 /**
  ******************************************************************************
- * @brief send message on socket
+ * @brief send message on socket, and free message mem
  * @param skt socket
  * @param p_msg pointer to message struct
- * @return err_value code
+ * @return err_value code, p_msg will be freed and set to NULL in any case
  ******************************************************************************
  */
-int send_msg(int skt, struct msg *p_msg);
+int send_msg(int skt, struct msg **p_p_msg);
 
 /**
  ******************************************************************************
