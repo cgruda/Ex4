@@ -51,7 +51,7 @@ char *msg_type_2_str[MSG_MAX] =
 	[MSG_CLIENT_SETUP]               = "CLIENT_SETUP",
 	[MSG_CLIENT_PLAYER_MOVE]         = "CLIENT_PLAYER_MOVE",
 	[MSG_CLIENT_DISCONNECT]          = "CLIENT_DISCONNECT",
-	[MSG_SERVER_MAIN_MENU]          = "SERVER_MAIN_MENUE",
+	[MSG_SERVER_MAIN_MENU]           = "SERVER_MAIN_MENU",
 	[MSG_SERVER_APPROVED]            = "SERVER_APPROVED",
 	[MSG_SERVER_DENIED]              = "SERVER_DENIED",
 	[MSG_SERVER_INVITE]              = "SERVER_INVITE",
@@ -293,23 +293,18 @@ int send_msg(int skt, struct msg **p_p_msg)
 	return ret_val;
 }
 
-int recv_msg(struct msg **p_p_msg, int skt, int timeout_sec)
+int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 {
-	DBG_FUNC_STAMP();
 	char buff[100] = {0}; // FIXME:
 	int res, ret_val = E_SUCCESS;
-	TIMEVAL time = {timeout_sec, 0};
-	PTIMEVAL p_time = NULL;
 	FD_SET readfs;
 
 	FD_ZERO(&readfs);
 	FD_SET(skt, &readfs);
-	p_time = (timeout_sec > 0) ? &time : NULL;
 
 	/* wait for message to arrive in socket */
-	res = select(0, &readfs, NULL, NULL, p_time);
+	res = select(0, &readfs, NULL, NULL, p_timeout);
 	if (!res) {
-		PRINT_ERROR(E_TIMEOUT);
 		return E_TIMEOUT;
 	} else if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);

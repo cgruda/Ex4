@@ -23,9 +23,10 @@
 #define MSG_TIMEOUT_INFINITE         -1
 #define MSG_TIMEOUT_SEC_DEFAULT      15
 #define MSG_TIMEOUT_SEC_MAX          30
-#define MSG_TIMOUT_SEC_HUMAN_MAX     600 // 10 mins
+#define MSG_TIMOUT_SEC_HUMAN_MAX     900 // 15 mins
 #define MSG_MAX_PARAMS               4
-
+#define MSG_TIME_INCERMENT_SEC       1  // 1 sec
+#define MSG_TIME_INCERMENT_USEC      0  // 0 usec
 /*
  ==============================================================================
  * ENUMERATIONS
@@ -127,6 +128,6 @@ int send_msg(int skt, struct msg **p_p_msg);
  *         E_WINSOCK - socket error            - no need to free msg
  ******************************************************************************
  */
-int recv_msg(struct msg **p_p_msg, int skt, int timeout_sec);
+int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout);
 
 #endif // __MESSAGES_H__

@@ -297,19 +297,21 @@ bool server_quit(struct serv_env *p_env)
 			return true;
 		}
 		/* wait for threads, quit in any case*/
-		wait_code = WaitForSingleObject(p_env->h_clnt_thread, 60000); // FIXME: more threads
-		switch (wait_code) {
-		case WAIT_OBJECT_0:
-			break;
-		case WAIT_TIMEOUT:
-			p_env->last_err = E_TIMEOUT;
-			break;
-		case WAIT_FAILED:
-			PRINT_ERROR(E_WINAPI);
-			/* fall through */
-		default:
-			p_env->last_err = E_WINAPI;
-			break;
+		if (p_env->h_clnt_thread) {
+			wait_code = WaitForSingleObject(p_env->h_clnt_thread, 60000); // FIXME: more threads
+			switch (wait_code) {
+			case WAIT_OBJECT_0:
+				break;
+			case WAIT_TIMEOUT:
+				p_env->last_err = E_TIMEOUT;
+				break;
+			case WAIT_FAILED:
+				PRINT_ERROR(E_WINAPI);
+				/* fall through */
+			default:
+				p_env->last_err = E_WINAPI;
+				break;
+			}
 		}
 		/* signal main to quit */
 		DBG_PRINT("server_quit = true\n");
@@ -456,6 +458,13 @@ int server_cleanup(struct serv_env *p_env)
 		}
 	}
 
+	if (p_env->h_clnt_thread) { // FIXME: multiple threads
+		if (!CloseHandle(p_env->h_clnt_thread)) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_FAILURE;
+		}
+	}
+
 	if (WSACleanup()) {
 		PRINT_ERROR(E_WINSOCK);
 		ret_val = E_FAILURE;
@@ -463,8 +472,6 @@ int server_cleanup(struct serv_env *p_env)
 
 	return ret_val;
 }
-
-
 
 // server send message wrapper
 int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char *p2, char *p3)
@@ -483,6 +490,31 @@ int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char
 
 	/* free message */
 	free_msg(&p_msg);
+
+	return res;
+}
+
+// server recv message wrapper
+int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec)
+{
+	DBG_FUNC_STAMP();
+	
+	TIMEVAL tv;
+	int res;
+
+	while (timeout_sec--) {
+
+		if (server_check_abort(p_clnt->p_env))
+			return E_INTERNAL;
+
+		tv.tv_sec  = MSG_TIME_INCERMENT_SEC;
+		tv.tv_usec = MSG_TIME_INCERMENT_USEC;
+		res = recv_msg(p_p_msg, p_clnt->skt, &tv);
+		if (res == E_TIMEOUT)
+			continue;
+		else
+			break;
+	}
 
 	return res;
 }

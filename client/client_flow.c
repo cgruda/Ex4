@@ -55,7 +55,7 @@ int flow_clnt_connect_success(struct client_env *p_env)
 		res = STATE_UNDEFINED_FLOW;
 	}
 
-	free(&p_msg);
+	free_msg(&p_msg);
 	return res;
 }
 

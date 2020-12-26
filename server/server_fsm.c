@@ -57,13 +57,53 @@ int flow_serv_undefined_flow(struct clnt_args *p_clnt)
 }
 
 
+
+flow_serv_disconnect(struct clnt_args *p_clnt)
+{
+	DBG_FUNC_STAMP();
+	assert(p_clnt->connected);
+
+	// int res;
+
+	// what if during game??
+
+	if (!ReleaseSemaphore(p_clnt->p_env->h_players_smpr, 1, NULL)) {
+		PRINT_ERROR(E_WINSOCK);
+		// signal main a critical error????
+	}
+
+	p_clnt->connected = false;
+
+	return STATE_THREAD_CLEANUP;
+}
+
+
+flow_serv_thread_cleanup(struct clnt_args *p_clnt)
+{
+	DBG_FUNC_STAMP();
+	assert(!p_clnt->connected);
+
+	if (closesocket(p_clnt->skt) == SOCKET_ERROR) {
+		PRINT_ERROR(E_WINSOCK);
+		p_clnt->last_err = E_WINSOCK;
+	}
+
+	return STATE_THREAD_EXIT;
+}
+
 int flow_serv_abort_thread(struct clnt_args *p_clnt)
 {
 	DBG_FUNC_STAMP();
+
+	/* disconnect thread, errors dont affect flow */
 	if (p_clnt->connected)
-		return STATE_DISCONNECT;
-	else
-		return STATE_THREAD_CLEANUP;
+		flow_serv_disconnect(p_clnt);
+
+	/* cleanup thread, errors dont affect flow */
+	flow_serv_thread_cleanup(p_clnt);
+
+	return STATE_THREAD_EXIT;
+
 }
 
 
@@ -98,7 +138,7 @@ flow_serv_main_menu(struct clnt_args *p_clnt)
 		return STATE_DISCONNECT;
 	}
 
-	res = recv_msg(&p_msg, p_clnt->skt, MSG_TIMOUT_SEC_HUMAN_MAX);
+	res = server_recv_msg(p_clnt, &p_msg, MSG_TIMOUT_SEC_HUMAN_MAX);
 	if (res != E_SUCCESS) {
 		p_clnt->last_err = res;
 		return STATE_DISCONNECT;
@@ -107,7 +147,7 @@ flow_serv_main_menu(struct clnt_args *p_clnt)
 	switch (p_msg->type)
 	{
 	case MSG_CLIENT_VERSUS:
-		state = STATE_DISCONNECT; // FIXME:
+		state = STATE_DISCONNECT; // FIXME: temporary
 		/* code */
 		break;
 	case MSG_CLIENT_DISCONNECT:
@@ -118,41 +158,10 @@ flow_serv_main_menu(struct clnt_args *p_clnt)
 		break;
 	}
 
+	free_msg(&p_msg);
 	return STATE_THREAD_EXIT;
 }
 
-flow_serv_disconnect(struct clnt_args *p_clnt)
-{
-	DBG_FUNC_STAMP();
-	assert(p_clnt->connected);
-
-	// int res;
-
-	// what if during game??
-
-	if (!ReleaseSemaphore(p_clnt->p_env->h_players_smpr, 1, NULL)) {
-		PRINT_ERROR(E_WINSOCK);
-		// signal main a critical error????
-	}
-
-	p_clnt->connected = false;
-
-	return STATE_THREAD_CLEANUP;
-}
-
-
-flow_serv_thread_cleanup(struct clnt_args *p_clnt)
-{
-	DBG_FUNC_STAMP();
-	assert(!p_clnt->connected);
-
-	if (closesocket(p_clnt->skt) == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
-		p_clnt->last_err = E_WINSOCK;
-	}
-
-	return STATE_THREAD_EXIT;
-}
 
 int flow_serv_connect_approve(struct clnt_args *p_clnt)
 {
@@ -192,7 +201,7 @@ int flow_serv_connect(struct clnt_args *p_clnt)
 	int res, state;
 	DWORD wait_code;
 
-	res = recv_msg(&p_msg, p_clnt->skt, MSG_TIMEOUT_SEC_DEFAULT);
+	res = server_recv_msg(p_clnt, &p_msg, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
 		p_clnt->last_err = res;
 		return STATE_THREAD_CLEANUP;

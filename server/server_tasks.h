@@ -237,4 +237,21 @@ void print_error(int err_val);
 int server_send_msg(struct clnt_args *p_clnt, int type,
 	char *p0, char *p1, char *p2, char *p3);
 
+/**
+ ******************************************************************************
+ * @brief wrapper for receiving message from client, this wrapper splits
+ *        the timeout into MSG_TIME_INCERMENT to allow checking if thread
+ *        got abort from main thread.
+ * @param p_clnt pointer to client object
+ * @param p_p_msg pointer to message pointer to get message
+ * @param timeout sec timeout in seconds
+ * @return E_SUCCESS - all good
+ *         E_FAILURE - bad input to function
+ *         E_STDLIB  - mem allocation error
+ *         E_WINSOCK - socket error
+ ******************************************************************************
+ */
+int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec);
+
+
 #endif // __SERVER_TASKS_H__
