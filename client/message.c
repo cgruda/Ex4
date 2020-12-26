@@ -9,7 +9,7 @@
  * of the communication protocol used by the server
  * and client for playing a game.
  * 
- * messages MUST be created only by using new_message()
+ * messages MUST be created only by using new_msg()
  * and freed only by using free_msg(). static messages
  * are un-supporetd by this module, and may result with
  * un-expected behaviour of the program.
@@ -51,7 +51,7 @@ char *msg_type_2_str[MSG_MAX] =
 	[MSG_CLIENT_SETUP]               = "CLIENT_SETUP",
 	[MSG_CLIENT_PLAYER_MOVE]         = "CLIENT_PLAYER_MOVE",
 	[MSG_CLIENT_DISCONNECT]          = "CLIENT_DISCONNECT",
-	[MSG_SERVER_MAIN_MENUE]          = "SERVER_MAIN_MENUE",
+	[MSG_SERVER_MAIN_MENU]          = "SERVER_MAIN_MENUE",
 	[MSG_SERVER_APPROVED]            = "SERVER_APPROVED",
 	[MSG_SERVER_DENIED]              = "SERVER_DENIED",
 	[MSG_SERVER_INVITE]              = "SERVER_INVITE",
@@ -69,22 +69,24 @@ char *msg_type_2_str[MSG_MAX] =
  ==============================================================================
  */
 
-int msg_len(struct msg *p_msg)
+int msg_buff_len(struct msg *p_msg)
 {
-	int msg_len = 0;
+	int buff_len = 0;
 	
-	msg_len += strlen(msg_type_2_str[p_msg->type]);
+	/* type str length */
+	buff_len += strlen(msg_type_2_str[p_msg->type]);
 
+	/* params len including delimiters */
 	if (p_msg->param_cnt) {
-		msg_len += p_msg->param_cnt;
+		buff_len += p_msg->param_cnt;
 		for (int i = 0; i < p_msg->param_cnt; i++)
-			msg_len += strlen(p_msg->param_lst[i]);
+			buff_len += strlen(p_msg->param_lst[i]);
 	}
 
-	return msg_len;
+	return buff_len;
 }
 
-int print_msg_2_buff(char *buff, struct msg *p_msg)
+int msg_2_buff(char *buff, struct msg *p_msg)
 {
 	char *str = msg_type_2_str[p_msg->type];
 	int offset = 0;
@@ -101,33 +103,34 @@ int print_msg_2_buff(char *buff, struct msg *p_msg)
 		offset += strlen(str);
 	}
 
-	// DBG_PRINT("print_msg_2_buff: %s\n", buff); // FIXME: null termination
 	return offset;
 }
 
 int new_msg_param(char **p_param_dst, char *param_src)
 {
+	/* null param is fine */
 	if (!param_src)
 		return E_SUCCESS;
-	
-	*p_param_dst = NULL;
-	int mem_size = strlen(param_src) + 1;
 
+	/* reset params */	
+	*p_param_dst = NULL;
+
+	/* allocate param mem */
+	int mem_size = strlen(param_src) + 1;
 	*p_param_dst = calloc(mem_size, sizeof(char));
 	if (!*p_param_dst) {
 		PRINT_ERROR(E_STDLIB);
 		return E_STDLIB;
 	}
 
+	/* fill param */
 	memcpy(*p_param_dst, param_src, mem_size - 1);
 
-	// DBG_PRINT("new_param=%s\n",*p_param_dst);
 	return E_SUCCESS;
 }
 
-int parse_buff_2_msg(char *buff, struct msg **p_p_msg)
+int buff_2_msg(char *buff, struct msg **p_p_msg)
 {
-	// DBG_FUNC_STAMP();
 	struct msg *p_msg = NULL;
 	char *token = NULL;
 	char *context = NULL;
@@ -135,7 +138,7 @@ int parse_buff_2_msg(char *buff, struct msg **p_p_msg)
 
 	*p_p_msg = NULL;
 
-	/* reset mssage struct */
+	/* allocate mem */
 	p_msg = calloc(1, sizeof(*p_msg));
 	if (p_msg == NULL) {
 		PRINT_ERROR(E_STDLIB);
@@ -161,6 +164,11 @@ int parse_buff_2_msg(char *buff, struct msg **p_p_msg)
 	/* parse params */
 	while(token = strtok_s(NULL, ";", &context)) {
 		idx = p_msg->param_cnt;
+		if (idx >= MSG_MAX_PARAMS) {
+			res = E_MESSAGE;
+			free_msg(&p_msg);
+			return res;
+		}
 		res = new_msg_param(&p_msg->param_lst[idx], token);
 		if (res != E_SUCCESS) {
 			free_msg(&p_msg);
@@ -174,11 +182,10 @@ int parse_buff_2_msg(char *buff, struct msg **p_p_msg)
 	return E_SUCCESS;
 }
 
-struct msg *new_message(int type, char *p0, char *p1, char *p2, char *p3)
+struct msg *new_msg(int type, char *p0, char *p1, char *p2, char *p3)
 {
-	// DBG_PRINT("new_message (%d)\n", type);
 	struct msg *p_msg = NULL;
-	char *param_lst   = NULL;
+	char *param_lst = NULL;
 	int res = E_SUCCESS;
 
 	/* allocate message */
@@ -210,7 +217,6 @@ struct msg *new_message(int type, char *p0, char *p1, char *p2, char *p3)
 
 void free_msg(struct msg **p_p_msg)
 {
-	// DBG_FUNC_STAMP();
 	/* sanity */
 	if (!p_p_msg)
 		return;
@@ -233,9 +239,8 @@ void print_msg(struct msg *p_msg)
 		printf("\t\tNULL\n");
 	} else {
 		printf("\t\ttype:      %s\n", msg_type_2_str[p_msg->type]);
-		// printf("\t\tparam_cnt: %d\n", p_msg->param_cnt);
 		for (int i = 0; i < p_msg->param_cnt; i++)
-			printf("\t\tparam[%d]:  %s\n", i, p_msg->param_lst[i]);
+			printf("\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
 	}
 	printf("\n");
 }
@@ -257,7 +262,7 @@ int send_msg(int skt, struct msg **p_p_msg)
 	/* do-while(0) for easy cleanup */
 	do {
 		/* allocate send buffer */
-		buff_len = msg_len(p_msg);
+		buff_len = msg_buff_len(p_msg);
 		buffer = calloc(buff_len + 1, sizeof(*buffer)); // FIXME: +1 is temporary for debug only
 		if (buffer == NULL) {
 			PRINT_ERROR(E_STDLIB);
@@ -266,7 +271,7 @@ int send_msg(int skt, struct msg **p_p_msg)
 		}
 
 		/* fill buffer with messgae */
-		print_msg_2_buff(buffer, p_msg);
+		msg_2_buff(buffer, p_msg);
 
 		/* send message */
 		res = send(skt, buffer, buff_len, 0);
@@ -292,12 +297,11 @@ int recv_msg(struct msg **p_p_msg, int skt, int timeout_sec)
 {
 	DBG_FUNC_STAMP();
 	char buff[100] = {0}; // FIXME:
-	int res;
-	int ret_val = E_SUCCESS;
+	int res, ret_val = E_SUCCESS;
 	TIMEVAL time = {timeout_sec, 0};
 	PTIMEVAL p_time = NULL;
-	
 	FD_SET readfs;
+
 	FD_ZERO(&readfs);
 	FD_SET(skt, &readfs);
 	p_time = (timeout_sec > 0) ? &time : NULL;
@@ -320,7 +324,7 @@ int recv_msg(struct msg **p_p_msg, int skt, int timeout_sec)
 	}
 
 	/* parse message */
-	res = parse_buff_2_msg(buff, p_p_msg);
+	res = buff_2_msg(buff, p_p_msg);
 	print_msg(*p_p_msg);
 
 	return res;

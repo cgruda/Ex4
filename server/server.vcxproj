@@ -142,10 +142,12 @@
     <ClCompile Include="main.c" />
     <ClCompile Include="message.c" />
     <ClCompile Include="server_tasks.c" />
+    <ClCompile Include="server_fsm.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="message.h" />
     <ClInclude Include="server_tasks.h" />
+    <ClInclude Include="server_fsm.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

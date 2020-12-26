@@ -22,7 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+#include <stdbool.h>
 
 /*
  ==============================================================================
@@ -52,6 +52,7 @@ enum err_val
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,
+	E_FLOW,
 	E_MAX
 };
 
@@ -91,6 +92,7 @@ struct client_env
 	char  *username;
 
 	int skt;
+	bool connected;
 	SOCKADDR_IN server;
 	int last_error;
 };
@@ -131,9 +133,9 @@ int client_init(struct client_env *p_env);
 
 /**
  ******************************************************************************
- * @brief check input arguments to program, and set env struct
- * @param p_env pointer to env
- * @return err_val on error, (p_env->last_error) on success
+ * @brief TODO:
+ * @param 
+ * @return
  ******************************************************************************
  */
 int client_cleanup(struct client_env *p_env);

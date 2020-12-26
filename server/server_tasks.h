@@ -48,7 +48,6 @@
 
 #define MAX_PORT             65536
 
-
 #define MAX_PLAYERS 2
 #define MSG_MAX_PARAMS 4
 
@@ -58,16 +57,19 @@
  ==============================================================================
  */
 
-enum err_value
+enum err_val
 {
 	E_SUCCESS = 0,
 	E_FAILURE,
 	E_INTERNAL,
 	E_TIMEOUT,
-        E_MESSAGE,
+	E_MESSAGE,
+	E_INPUT,
 	E_STDLIB,
 	E_WINAPI,
 	E_WINSOCK,
+	E_FLOW,
+	E_MAX
 };
 
 /*
@@ -76,7 +78,7 @@ enum err_value
  ==============================================================================
  */
 // debug stamp [file;line]
-#define DBG_STAMP()     printf("[%-9s;%-3d] ", __FILENAME__, __LINE__)
+#define DBG_STAMP()     printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
 
 
 // for debuging
@@ -97,41 +99,49 @@ enum err_value
  ==============================================================================
  */
 
-struct args
+struct clnt_args
 {
-	char *server_ip;
-	uint16_t server_port;
+	int last_err;
+	int skt;
+	struct serv_env *p_env;
+	bool connected;
+	bool playing;
 };
 
-struct player
-{
-	int id;
-	int clnt_skt;
-	HANDLE h_thread;
-	bool wating_play;
-};
+// struct player
+// {
+// 	int id;
+// 	int skt;
+// 	HANDLE h_thread;
+// 	bool wating_play;
+// };
 
-struct server_env
+struct serv_env
 {
-	// input args
-	struct args args;
 	// quit server params
 	HANDLE h_file_stdin;
 	OVERLAPPED olp_stdin;
 	char buffer[7];
+
 	// server handling params
-	int serv_skt;
+	WSADATA	wsa_data;
+	char *serv_ip;
+	unsigned short serv_port;
 	SOCKADDR_IN server;
+	int serv_skt;
+
+	// control params
+	HANDLE h_players_smpr;
+	HANDLE h_abort_evt;
+
+	// clients
+	HANDLE h_clnt_thread; // FIXME: need to support more tham 1. possibly use realloc
+	int clnt_cnt;
 	// client handling
-	struct player player_db[MAX_PLAYERS];
-	int player_cnt;
+	// struct player player_db[MAX_PLAYERS];
+	// int player_cnt;
 
-
-	// temp
-	HANDLE h_clnt_thread;
-
-
-	//FD_SET read_fds;
+	int last_err;
 };
 
 /*
@@ -139,24 +149,92 @@ struct server_env
  * DECLARATIONS
  ==============================================================================
  */
+
 /**
  ******************************************************************************
- * @brief 
- * @param 
+ * @brief TODO:
  * @param 
  * @return 
  ******************************************************************************
  */
+int check_input(struct serv_env *p_env, int argc, char **argv);
 
-int check_input(struct server_env* p_env, int argc, char** argv);
+/**
+ ******************************************************************************
+ * @brief TODO:
+ * @param 
+ * @return 
+ ******************************************************************************
+ */
 int my_atoi(char *str, int *p_result);
-bool server_quit(struct server_env *p_env);
-int server_init(struct server_env *p_env);
-int server_cleanup(struct server_env *p_env);
-int server_accept_client(struct server_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief check if exit command was given, and if did - abort all threads
+ * @param p_env pointer to server env
+ * @return true  - got exit or encountered errors (see p_env->last_err)
+ *         false - otherwise
+ ******************************************************************************
+ */
+bool server_quit(struct serv_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief TODO:
+ * @param 
+ * @return 
+ ******************************************************************************
+ */
+int server_init(struct serv_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief TODO:
+ * @param 
+ * @return 
+ ******************************************************************************
+ */
+int server_cleanup(struct serv_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief TODO:
+ * @param 
+ * @return 
+ ******************************************************************************
+ */
+bool server_check_abort(struct serv_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief TODO:
+ * @param 
+ * @return 
+ ******************************************************************************
+ */
+int serv_clnt_connect(struct serv_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief print error message to stdin
+ * @param err_val (enum err_val)
+ ******************************************************************************
+ */
 void print_error(int err_val);
 
-
-
+/**
+ ******************************************************************************
+ * @brief wrapper for creating and sending message from server to client
+ * @param p_clnt pointer to client object
+ * @param type of message to be sent
+ * @param p0-3 parameters to be sent
+ * @return E_SUCCESS - all good
+ *         E_FAILURE - bad input to function
+ *         E_STDLIB  - mem allocation error
+ *         E_WINSOCK - socket error
+ ******************************************************************************
+ */
+int server_send_msg(struct clnt_args *p_clnt, int type,
+	char *p0, char *p1, char *p2, char *p3);
 
 #endif // __SERVER_TASKS_H__

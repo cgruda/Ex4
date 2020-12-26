@@ -35,6 +35,7 @@ void print_usage()
 	printf("\nusage:\n\tclient.exe <server ip> <port> <username>\n\n");
 }
 
+
 void print_error(int err_val)
 {
 	printf("Error: ");
@@ -61,6 +62,9 @@ void print_error(int err_val)
 		break;
 	case E_TIMEOUT:
 		printf("Timeout Error\n");
+		break;
+	case E_FLOW:
+		printf("Flow Error\n");
 		break;
 	default:
 		printf("Unknown Error 0x%02X\n", err_val);
@@ -126,7 +130,7 @@ int client_init(struct client_env *p_env)
 		return STATE_EXIT;
 	}
 
-	/* set server addres */
+	/* set server address */
 	p_env->skt                    = INVALID_SOCKET;
 	p_env->server.sin_family      = AF_INET;
 	p_env->server.sin_addr.s_addr = inet_addr(p_env->serv_ip);
@@ -136,7 +140,6 @@ int client_init(struct client_env *p_env)
 }
 
 
-// client send message wrapper
 int cilent_send_msg(struct client_env *p_env, int type, char *param)
 {
 	DBG_FUNC_STAMP();
@@ -144,7 +147,7 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 	int res;
 
 	/* create message */
-	p_msg = new_message(type, param, NULL, NULL, NULL);
+	p_msg = new_msg(type, param, NULL, NULL, NULL);
 	if (p_msg == NULL)
 		return E_STDLIB;
 

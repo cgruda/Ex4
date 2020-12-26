@@ -23,6 +23,7 @@
 #define MSG_TIMEOUT_INFINITE         -1
 #define MSG_TIMEOUT_SEC_DEFAULT      15
 #define MSG_TIMEOUT_SEC_MAX          30
+#define MSG_TIMOUT_SEC_HUMAN_MAX     600 // 10 mins
 #define MSG_MAX_PARAMS               4
 
 /*
@@ -42,7 +43,7 @@ enum msg_type
 	MSG_CLIENT_PLAYER_MOVE,
 	MSG_CLIENT_DISCONNECT,
 	/* server messgaes */
-	MSG_SERVER_MAIN_MENUE,
+	MSG_SERVER_MAIN_MENU,
 	MSG_SERVER_APPROVED,
 	MSG_SERVER_DENIED,
 	MSG_SERVER_INVITE,
@@ -90,7 +91,7 @@ void print_msg(struct msg *p_msg);
  * @return pointer to new allocated message, NULL on failure
  ******************************************************************************
  */
-struct msg *new_message(int type, char *p0, char *p1, char *p2, char *p3);
+struct msg *new_msg(int type, char *p0, char *p1, char *p2, char *p3);
 
 /**
  ******************************************************************************

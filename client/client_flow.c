@@ -16,6 +16,8 @@
  */
 
 #include <stdio.h>
+#include <stdbool.h>
+#include <assert.h>
 #include "client_tasks.h"
 #include "client_flow.h"
 #include "message.h"
@@ -30,9 +32,12 @@
 int flow_clnt_connect_success(struct client_env *p_env)
 {
 	DBG_FUNC_STAMP();
+	assert(!p_env->connected);
 
 	struct msg *p_msg;
 	int res;
+
+	p_env->connected = true;
 
 	res = recv_msg(&p_msg, p_env->skt, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
@@ -43,8 +48,8 @@ int flow_clnt_connect_success(struct client_env *p_env)
 	/* interpet server response */
 	switch (p_msg->type)
 	{
-	case MSG_SERVER_MAIN_MENUE:
-		res = STATE_GAME_MENU;
+	case MSG_SERVER_MAIN_MENU:
+		res = STATE_MAIN_MENU;
 		break;
 	default:
 		res = STATE_UNDEFINED_FLOW;
@@ -58,9 +63,10 @@ int flow_clnt_connect_success(struct client_env *p_env)
 
 
 
-int flow_clnt_game_menu(struct client_env *p_env)
+int flow_clnt_main_menu(struct client_env *p_env)
 {	
 	DBG_FUNC_STAMP();
+	assert(p_env->connected);
 	int choice;
 
 	UI_PRINT(UI_MENU_PLAY);
@@ -71,15 +77,31 @@ int flow_clnt_game_menu(struct client_env *p_env)
 	case CHOICE_PLAY:
 		// TODO: fallthroug for now
 	case CHOICE_QUIT:
-		return STATE_EXIT;
+		return STATE_DISCONNECT;
 	default:
 		PRINT_ERROR(E_INPUT);
 		p_env->last_error = E_INPUT;
-		return STATE_EXIT;
+		return STATE_DISCONNECT;
 	}
 }
 
 
+
+int flow_clnt_disconnect(struct client_env *p_env)
+{
+	DBG_FUNC_STAMP();
+	assert(p_env->connected);
+
+	/* send disconncet message. if error occures there
+	 * is nothing to be done, i.e we exit anyway. so no
+	 * purpose in getting or cheking result. error print
+	 * will be called from within call */
+	cilent_send_msg(p_env, MSG_CLIENT_DISCONNECT, NULL);
+
+	p_env->connected = false;
+
+	return STATE_EXIT;
+}
 
 
 
@@ -87,6 +109,7 @@ int flow_clnt_game_menu(struct client_env *p_env)
 int flow_clnt_connect_denied(struct client_env *p_env)
 {
 	DBG_FUNC_STAMP();
+	assert(!p_env->connected);
 
 	UI_PRINT(UI_CONNECT_DENY, p_env->serv_ip, p_env->serv_port);
 
@@ -100,9 +123,12 @@ int flow_clnt_connect_denied(struct client_env *p_env)
 int flow_clnt_undefined_flow(struct client_env *p_env)
 {
 	DBG_FUNC_STAMP();
-	DBG_PRINT(">> last_error:\n");
-	PRINT_ERROR(p_env->last_error);
-	return STATE_EXIT;
+	PRINT_ERROR(E_FLOW);
+	
+	if (p_env->connected)
+		return STATE_DISCONNECT;
+	else
+		return STATE_EXIT;
 }
 
 
@@ -128,7 +154,9 @@ int flow_clnt_recieve_failure(struct client_env *p_env)
 int flow_clnt_connect_failure(struct client_env *p_env)
 {
 	DBG_FUNC_STAMP();
-	int user_choice;
+	assert(!p_env->connected);
+
+	int choice;
 	int res;
 
 	// check why connection failed?
@@ -144,10 +172,10 @@ int flow_clnt_connect_failure(struct client_env *p_env)
 
 	/* print menu and await choice */
 	UI_PRINT(UI_MENU_CONNECT);
-	UI_GET(&user_choice);
+	UI_GET(&choice);
 
 	/* parse choice */
-	switch (user_choice)
+	switch (choice)
 	{
 	case CHOICE_RECONNECT:
 		return STATE_CONNECT_ATTEMPT;
@@ -164,8 +192,10 @@ int flow_clnt_connect_failure(struct client_env *p_env)
 int flow_clnt_connect_attempt(struct client_env *p_env)
 {
 	DBG_FUNC_STAMP();
+	assert(!p_env->connected);
+
 	struct msg *p_msg = NULL;
-	int res;
+	int res, state;
 
 	/* create socket */
 	p_env->skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -204,20 +234,20 @@ int flow_clnt_connect_attempt(struct client_env *p_env)
 	switch (p_msg->type)
 	{
 	case MSG_SERVER_APPROVED:
-		res = STATE_CONNECT_SUCCESS;
+		state = STATE_CONNECT_SUCCESS;
 		break;
 	case MSG_SERVER_DENIED:
-		res = STATE_CONNECT_DENIED;
+		state = STATE_CONNECT_DENIED;
 		break;
 	default:
-		p_env->last_error = E_INTERNAL;
-		res = STATE_UNDEFINED_FLOW;
+		p_env->last_error = E_FLOW;
+		state = STATE_UNDEFINED_FLOW;
 	}
 
 	/* free recieved message */
 	free_msg(&p_msg);
 
-	return res;
+	return state;
 }
 
 
@@ -230,5 +260,6 @@ int(*clnt_flow[STATE_MAX])(struct client_env *p_env) =
 	[STATE_CONNECT_DENIED]  = flow_clnt_connect_denied,
 	[STATE_UNDEFINED_FLOW]  = flow_clnt_undefined_flow,
 	[STATE_RECIEVE_FAILURE] = flow_clnt_recieve_failure,
-	[STATE_GAME_MENU]       = flow_clnt_game_menu,
+	[STATE_DISCONNECT]      = flow_clnt_disconnect,
+	[STATE_MAIN_MENU]       = flow_clnt_main_menu,
 };

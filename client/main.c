@@ -30,18 +30,17 @@ int main(int argc, char **argv)
 	struct client_env env = {0};
 	int ret_val, state;
 
-	/* check program input arguments */
-	if (check_input(&env, argc, argv) != E_SUCCESS)
-		return E_FAILURE;
+	/* check input arguments */
+	ret_val = check_input(&env, argc, argv);
+	if (ret_val != E_SUCCESS)
+		return ret_val;
 
 	/* initialize client resources */
 	state = client_init(&env);
 
 	/* client execution loop */
 	while (state != STATE_EXIT)
-	{
 		state = (*clnt_flow[state])(&env);
-	}
 
 	/* free client resources */
 	ret_val = client_cleanup(&env);
