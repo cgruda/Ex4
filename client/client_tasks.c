@@ -23,6 +23,7 @@
 #include "client_tasks.h"
 #include "client_flow.h"
 #include "message.h"
+#include "tasks.h"
 
 /*
  ==============================================================================
@@ -33,42 +34,6 @@
 void print_usage()
 {
 	printf("\nusage:\n\tclient.exe <server ip> <port> <username>\n\n");
-}
-
-
-void print_error(int err_val)
-{
-	printf("Error: ");
-
-	/* print relevant error */
-	switch (err_val) {
-	case E_STDLIB:
-		printf("errno = %d\n", errno);
-		break;
-	case E_WINAPI:
-		printf("WinAPI Error 0x%X\n", GetLastError());
-		break;
-	case E_WINSOCK:
-		printf("Windows Socket Error %d\n", WSAGetLastError());
-		break;
-	case E_INTERNAL:
-		printf("Internal Error\n");
-		break;
-	case E_MESSAGE:
-		printf("Message Error\n");
-		break;
-	case E_INPUT:
-		printf("Input Error\n");
-		break;
-	case E_TIMEOUT:
-		printf("Timeout Error\n");
-		break;
-	case E_FLOW:
-		printf("Flow Error\n");
-		break;
-	default:
-		printf("Unknown Error 0x%02X\n", err_val);
-	}
 }
 
 int check_input(struct client_env *p_env, int argc, char** argv)
@@ -139,7 +104,6 @@ int client_init(struct client_env *p_env)
 	return STATE_CONNECT_ATTEMPT;
 }
 
-
 int cilent_send_msg(struct client_env *p_env, int type, char *param)
 {
 	DBG_FUNC_STAMP();
@@ -159,6 +123,20 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 
 	return res;
 }
+
+int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec)
+{
+	int res;
+	TIMEVAL tv = {0};
+
+	tv.tv_sec = timeout_sec;
+	res = recv_msg(p_p_msg, p_env->skt, &tv);
+	if (res != E_SUCCESS)
+		p_env->last_error = res;
+	
+	return res;
+}
+
 
 int client_cleanup(struct client_env *p_env)
 {

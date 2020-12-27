@@ -30,54 +30,8 @@
  ==============================================================================
  */
 
-#define DBG_ENABLE           1
 #define ARGC                 4
 #define MAX_USERNAME_LEN     20
-#define MAX_PORT             65536
-
-/*
- ==============================================================================
- * ENUMERATIONS
- ==============================================================================
- */
-
-enum err_val
-{
-	E_SUCCESS = 0,
-	E_FAILURE,
-	E_INTERNAL,
-	E_TIMEOUT,
-	E_MESSAGE,
-	E_INPUT,
-	E_STDLIB,
-	E_WINAPI,
-	E_WINSOCK,
-	E_FLOW,
-	E_MAX
-};
-
-/*
- ==============================================================================
- * MACROS
- ==============================================================================
- */
-// debug stamp [file;line]
-#define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
-
-#define DBG_STAMP()     printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
-
-// print error message
-#define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
-
-// for debuging
-#if DBG_ENABLE
-#define DBG_PRINT(...)  do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
-#define DBG_FUNC_STAMP()  do {DBG_STAMP(); printf("$$$ %s\n", __func__);} while (0)
-
-#else
-#define DBG_PRINT(...)
-#define DBG_FUNC_STAMP()
-#endif
 
 /*
  ==============================================================================
@@ -102,14 +56,6 @@ struct client_env
  * DECLARATIONS
  ==============================================================================
  */
-
-/**
- ******************************************************************************
- * @brief print error message to stdin
- * @param err_val (enum err_val)
- ******************************************************************************
- */
-void print_error(int err_val);
 
 /**
  ******************************************************************************
@@ -153,5 +99,21 @@ int client_cleanup(struct client_env *p_env);
  ******************************************************************************
  */
 int cilent_send_msg(struct client_env *p_env, int type, char *param);
+
+/**
+ ******************************************************************************
+ * @brief wrapper for recieving a message from the server
+ * @param p_env pointer to client env
+ * @param p_p_msg pointer to message pointer to hold recieved message
+ * @param timeout_sec
+ * @return E_SUCESS  - all good                - need to free msg
+ *         E_MESSAGE - message was corrupted   - no need to free msg
+ *         E_TIMEOUT - timeout waiting for msg - no need to free msg
+ *         E_STDLIB  - mem error               - no need to free msg
+ *         E_WINSOCK - socket error            - no need to free msg
+ ******************************************************************************
+ */
+int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec);
+
 
 #endif // __CLIENT_TASKS_H__

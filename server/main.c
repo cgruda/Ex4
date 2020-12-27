@@ -16,14 +16,10 @@
 
 #include "winsock2.h"
 #include <stdint.h>
-
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <ctype.h>
-#include <stdbool.h>
-#include <process.h>
 #include "server_tasks.h"
+#include "tasks.h"
+
 
 /*
  ==============================================================================
@@ -45,10 +41,8 @@ int main(int argc, char **argv)
 	if (check_input(&env, argc, argv))
 		return E_FAILURE;
 
-	// int count = 0;
-
 	/* do-while(0) for easy cleanup */
-	do {
+	do { // TODO: fix
 		if (server_init(&env))
 			break;
 
@@ -57,7 +51,6 @@ int main(int argc, char **argv)
 			
 			if(serv_clnt_connect(&env))
 				break;
-			//count++;
 		}
 
 		ret_val = E_SUCCESS;
@@ -67,7 +60,6 @@ int main(int argc, char **argv)
 	if (server_cleanup(&env))
 		ret_val = E_FAILURE;
 
-	//printf("BYBY BIRDY count=%d\n", count);
 	printf("--- SERVER EXIT %s ---\n", ret_val ? "FAILURE" : "SUCCESS");
 	return ret_val;
 }

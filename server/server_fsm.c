@@ -20,6 +20,7 @@
 #include "server_tasks.h"
 #include "server_fsm.h"
 #include "message.h"
+#include "tasks.h"
 
 /*
  ==============================================================================

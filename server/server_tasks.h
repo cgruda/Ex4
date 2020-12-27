@@ -32,24 +32,12 @@
  * DEFINES
  ==============================================================================
  */
-// debug prints enable
-#define DBG_ENABLE     1
 
 // input arguments count
 #define ARGC           3
 
-// for debug use
-#define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
-
-// wating times
-#define MAX_WAIT_TIME_ALL_MS (10 * MIN2SEC * SEC2MS)
-#define SEC2MS               1000
-#define MIN2SEC              60
-
-#define MAX_PORT             65536
 
 #define MAX_PLAYERS 2
-#define MSG_MAX_PARAMS 4
 
 /*
  ==============================================================================
@@ -57,41 +45,11 @@
  ==============================================================================
  */
 
-enum err_val
-{
-	E_SUCCESS = 0,
-	E_FAILURE,
-	E_INTERNAL,
-	E_TIMEOUT,
-	E_MESSAGE,
-	E_INPUT,
-	E_STDLIB,
-	E_WINAPI,
-	E_WINSOCK,
-	E_FLOW,
-	E_MAX
-};
-
 /*
  ==============================================================================
  * MACROS
  ==============================================================================
  */
-// debug stamp [file;line]
-#define DBG_STAMP()     printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
-
-
-// for debuging
-#if DBG_ENABLE
-#define DBG_PRINT(...)  do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
-#define DBG_FUNC_STAMP()  do {DBG_STAMP(); printf("$$$ %s\n", __func__);} while (0)
-#else
-#define DBG_PRINT(...)
-#endif
-
-// print error message
-#define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
-
 
 /*
  ==============================================================================
@@ -161,15 +119,6 @@ int check_input(struct serv_env *p_env, int argc, char **argv);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
- ******************************************************************************
- */
-int my_atoi(char *str, int *p_result);
-
-/**
- ******************************************************************************
  * @brief check if exit command was given, and if did - abort all threads
  * @param p_env pointer to server env
  * @return true  - got exit or encountered errors (see p_env->last_err)
@@ -213,14 +162,6 @@ bool server_check_abort(struct serv_env *p_env);
  ******************************************************************************
  */
 int serv_clnt_connect(struct serv_env *p_env);
-
-/**
- ******************************************************************************
- * @brief print error message to stdin
- * @param err_val (enum err_val)
- ******************************************************************************
- */
-void print_error(int err_val);
 
 /**
  ******************************************************************************

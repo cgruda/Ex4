@@ -19,77 +19,23 @@
  ==============================================================================
  */
 #include <windows.h>
-#include <errno.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include "server_tasks.h"
 #include "server_fsm.h"
 #include "message.h"
+#include "tasks.h"
 
 /*
  ==============================================================================
  * FUNCTION DEFENITIONS
  ==============================================================================
  */
-int my_atoi(char *str, int *p_result)
-{
-	if (!str || !p_result)
-		return E_FAILURE;
-
-	if ((*str != '+') && (*str != '-') && (!isdigit(*str)))
-		return E_FAILURE;
-
-	while (*(str++))
-		if (!isdigit(*str))
-			return E_FAILURE;
-
-	*p_result = strtol(str, NULL, 10);
-
-	if (errno == ERANGE)
-		return E_FAILURE;
-
-	return E_SUCCESS;
-}
 
 void print_usage()
 {
 	printf("\nusage:\n\tserver.exe <server ip> <port>\n\n");
-}
-
-void print_error(int err_val)
-{
-	printf("Error: ");
-
-	/* print relevant error */
-	switch (err_val) {
-	case E_STDLIB:
-		printf("errno = %d\n", errno);
-		break;
-	case E_WINAPI:
-		printf("WinAPI Error 0x%X\n", GetLastError());
-		break;
-	case E_WINSOCK:
-		printf("Windows Socket Error %d\n", WSAGetLastError());
-		break;
-	case E_INTERNAL:
-		printf("Internal Error\n");
-		break;
-	case E_MESSAGE:
-		printf("Message Error\n");
-		break;
-	case E_INPUT:
-		printf("Input Error\n");
-		break;
-	case E_TIMEOUT:
-		printf("Timeout Error\n");
-		break;
-	case E_FLOW:
-		printf("Flow Error\n");
-		break;
-	default:
-		printf("Unknown Error 0x%02X\n", err_val);
-	}
 }
 
 
@@ -249,7 +195,7 @@ int server_init(struct serv_env *p_env)
 	return E_SUCCESS;
 }
 
-bool server_quit(struct serv_env *p_env)
+bool server_quit(struct serv_env *p_env) // TODO: split 2
 {
 	DWORD wait_code;
 	int res;
@@ -326,7 +272,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 	int new_skt;
 	struct clnt_args *clnt_args = NULL;
 	FD_SET readfs;
-	TIMEVAL tv = {0, 1000};
+	TIMEVAL tv = {0, 1000}; // FIXME:
 
 	// char buffer[100];
 
@@ -340,7 +286,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 		return E_FAILURE;
 	}
 
-	/* socket signald */
+	/* socket is signald */
 	if (res) {
 		
 		/* accept incoming connection */
@@ -502,7 +448,7 @@ int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_
 	TIMEVAL tv;
 	int res;
 
-	while (timeout_sec--) {
+	while (timeout_sec--) { // FIXME: can be better?
 
 		if (server_check_abort(p_clnt->p_env))
 			return E_INTERNAL;

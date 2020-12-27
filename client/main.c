@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include "client_tasks.h"
 #include "client_flow.h"
+#include "tasks.h"
 
 /*
  ==============================================================================

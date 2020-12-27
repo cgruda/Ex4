@@ -20,6 +20,7 @@
 #include <assert.h>
 #include "client_tasks.h"
 #include "client_flow.h"
+#include "tasks.h"
 #include "message.h"
 
 /*
@@ -27,7 +28,6 @@
  * FUNCTION DEFENITIONS
  ==============================================================================
  */
-
 
 int flow_clnt_connect_success(struct client_env *p_env)
 {
@@ -39,7 +39,7 @@ int flow_clnt_connect_success(struct client_env *p_env)
 
 	p_env->connected = true;
 
-	res = recv_msg(&p_msg, p_env->skt, MSG_TIMEOUT_SEC_DEFAULT);
+	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
 		p_env->last_error = res;
 		return STATE_RECIEVE_FAILURE;
@@ -224,7 +224,7 @@ int flow_clnt_connect_attempt(struct client_env *p_env)
 	}
 	
 	/* recieve server answer */
-	res = recv_msg(&p_msg, p_env->skt, MSG_TIMEOUT_SEC_DEFAULT);
+	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
 		p_env->last_error = res;
 		return STATE_RECIEVE_FAILURE;

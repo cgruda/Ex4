@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="common">
+      <UniqueIdentifier>{f6dc1797-4808-4ecf-810b-8753fbdc1d55}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.c">
@@ -21,22 +24,28 @@
     <ClCompile Include="server_tasks.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="message.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="server_fsm.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\message.c">
+      <Filter>common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\tasks.c">
+      <Filter>common</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="server_tasks.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="message.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="server_fsm.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\message.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\tasks.h">
+      <Filter>common</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -72,6 +72,7 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(ProjectDir)\..\common;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
@@ -139,13 +140,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\common\message.c" />
+    <ClCompile Include="..\common\tasks.c" />
     <ClCompile Include="main.c" />
-    <ClCompile Include="message.c" />
     <ClCompile Include="server_tasks.c" />
     <ClCompile Include="server_fsm.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="message.h" />
+    <ClInclude Include="..\common\message.h" />
+    <ClInclude Include="..\common\tasks.h" />
     <ClInclude Include="server_tasks.h" />
     <ClInclude Include="server_fsm.h" />
   </ItemGroup>
