@@ -419,7 +419,6 @@ int server_cleanup(struct serv_env *p_env)
 	return ret_val;
 }
 
-// server send message wrapper
 int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char *p2, char *p3)
 {
 	DBG_FUNC_STAMP();
@@ -440,7 +439,6 @@ int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char
 	return res;
 }
 
-// server recv message wrapper
 int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec)
 {
 	DBG_FUNC_STAMP();
@@ -448,12 +446,14 @@ int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_
 	TIMEVAL tv;
 	int res;
 
-	while (timeout_sec--) { // FIXME: can be better?
+	int incerments = timeout_sec * (SEC2MS / (MSG_TIME_INCERMENT_USEC / MS2US));
+
+	while (incerments--) {
 
 		if (server_check_abort(p_clnt->p_env))
 			return E_INTERNAL;
 
-		tv.tv_sec  = MSG_TIME_INCERMENT_SEC;
+		tv.tv_sec  = 0;
 		tv.tv_usec = MSG_TIME_INCERMENT_USEC;
 		res = recv_msg(p_p_msg, p_clnt->skt, &tv);
 		if (res == E_TIMEOUT)

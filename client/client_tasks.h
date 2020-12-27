@@ -46,7 +46,7 @@ struct client_env
 	char  *username;
 
 	int skt;
-	bool connected;
+	bool approved;
 	SOCKADDR_IN server;
 	int last_error;
 };

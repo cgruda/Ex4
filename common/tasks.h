@@ -35,6 +35,7 @@
 #define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 
 // times
+#define MS2US                1000
 #define SEC2MS               1000
 #define MIN2SEC              60
 

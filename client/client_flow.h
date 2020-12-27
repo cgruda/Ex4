@@ -25,7 +25,7 @@
  */
 
 // user interface strings
-#define UI_CONNECT_PRE  "Connected to server on %s:%d\n"
+#define UI_CONNECTED  "Connected to server on %s:%d\n"
 #define UI_CONNECT_FAIL "Failed connecting to server on %s:%d.\n"
 #define UI_CONNECT_DENY "Server on %s:%d denied the connection request\n"
 #define UI_GAME_START   "Game is on!\n"
@@ -49,12 +49,13 @@ enum state_clnt
 	STATE_EXIT,
 	STATE_CONNECT_ATTEMPT,
 	STATE_CONNECT_FAILURE,
-	STATE_CONNECT_SUCCESS,
+	STATE_CONNECT_APPROVED,
 	STATE_CONNECT_DENIED,
 	STATE_DISCONNECT,
-	STATE_RECIEVE_FAILURE,
 	STATE_UNDEFINED_FLOW,
 	STATE_MAIN_MENU,
+	STATE_RECONNECT_MENU,
+	STATE_CLIENT_REQUEST,
 	STATE_MAX
 };
 

@@ -126,6 +126,7 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 
 int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec)
 {
+	DBG_FUNC_STAMP();
 	int res;
 	TIMEVAL tv = {0};
 
@@ -142,13 +143,6 @@ int client_cleanup(struct client_env *p_env)
 {
 	DBG_FUNC_STAMP();
 	int ret_val = p_env->last_error;
-
-	if (p_env->skt != INVALID_SOCKET) {
-		if (closesocket(p_env->skt) == SOCKET_ERROR) {
-			PRINT_ERROR(E_WINSOCK);
-			ret_val = E_WINSOCK;
-		}
-	}
 
 	if (WSACleanup()) {
 		PRINT_ERROR(E_WINSOCK);
