@@ -30,6 +30,8 @@
  */
 // debug prints enable
 #define DBG_ENABLE     1
+#define DBG_TRACE      1
+#define SERVER		"server"
 
 // for debug use
 #define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
@@ -104,5 +106,52 @@ int my_atoi(char *str, int *p_result);
  ******************************************************************************
  */
 void print_error(int err_val);
+
+
+
+
+
+#if DBG_TRACE
+
+enum dbg_trace_mode
+{
+	C,
+	S,
+	T,
+	DBG_TRACE_MODE_MAX,
+};
+
+#define DBG_TRACE_INIT(mode, name) dbg_trace_init(mode, name)
+#define DBG_TRACE_LOG(mode, name, str) dbg_trace_log(mode, name, str)
+
+#define DBG_TRACE_STAMP(mode, name) do {							\
+		char dbg_trace_stamp_str[100] = {0};						\
+		sprintf(dbg_trace_stamp_str, "[%-14s;%-3d] ", __FILENAME__, __LINE__);		\
+		DBG_TRACE_LOG(mode, name, dbg_trace_stamp_str);					\
+	} while (0)
+
+#define DBG_TRACE_STR(mode, name, str) do {							\
+		DBG_TRACE_STAMP(mode, name);							\
+		DBG_TRACE_LOG(mode, name, str);							\
+		DBG_TRACE_LOG(mode, name, "\n");						\
+	} while (0)
+
+#define DBG_TRACE_FUNC(mode, name) do { 							\
+		DBG_TRACE_STR(mode, name, __func__);						\
+	} while (0)
+
+#define DBG_TRACE_MSG(mode, name, p_msg) do {							\
+		char *dbg_trace_msg_str = dbg_trace_msg(p_msg);					\
+		DBG_TRACE_LOG(mode, name, dbg_trace_msg_str);					\
+		free(dbg_trace_msg_str);							\
+	} while (0)
+
+char *dbg_trace_get_path(int mode, char *name);
+void dbg_trace_init(int mode, char *name);
+void dbg_trace_log(int mode, char *name, char *str);
+
+#endif
+
+
 
 #endif // __TASKS_H__

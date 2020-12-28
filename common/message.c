@@ -25,6 +25,7 @@
  */
 
 #pragma comment(lib, "ws2_32.lib")
+#define _CRT_SECURE_NO_WARNINGS
 
 /*
  ==============================================================================
@@ -157,7 +158,7 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 
 	/* corrupt message */
 	if (p_msg->type == MSG_INVALID) {
-		free(&p_msg);
+		free_msg(&p_msg);
 		return E_MESSAGE;
 	}
 
@@ -238,17 +239,45 @@ void print_msg(struct msg *p_msg)
 	if (!p_msg) {
 		printf("\t\tNULL\n");
 	} else {
-		printf("\t\ttype:      %s\n", msg_type_2_str[p_msg->type]);
+		printf("\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
 		for (int i = 0; i < p_msg->param_cnt; i++)
 			printf("\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
 	}
 	printf("\n");
 }
 
+#if DBG_TRACE
+char *dbg_trace_msg(struct msg *p_msg)
+{
+	char *p, *str = calloc(100, sizeof(char));
+	if (!str) {
+		PRINT_ERROR(E_INTERNAL);
+		exit(E_FAILURE);
+	}
+	p = str;
+
+	sprintf(p, "\n\tmsg:\n");
+	p += strlen(p);
+
+	if (!p_msg) {
+		sprintf(p, "\t\tNULL\n");
+		p += strlen(p);
+	} else {
+		sprintf(p, "\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
+		p += strlen(p);
+		for (int i = 0; i < p_msg->param_cnt; i++) {
+			sprintf(p, "\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
+			p += strlen(p);
+		}
+	}
+	sprintf(p, "\n");
+	return str;
+}
+#endif
+
+
 int send_msg(int skt, struct msg **p_p_msg)
 {
-	DBG_FUNC_STAMP();
-	print_msg(*p_p_msg);
 	char *buffer = NULL;
 	struct msg *p_msg = *p_p_msg;
 	int ret_val;
@@ -320,7 +349,6 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 
 	/* parse message */
 	res = buff_2_msg(buff, p_p_msg);
-	print_msg(*p_p_msg);
 
 	return res;
 }

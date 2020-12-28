@@ -8,6 +8,8 @@
  * by: Chaim Gruda
  *     Nir Beiber
  */
+#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
+#define _CRT_SECURE_NO_WARNINGS
 
 /*
  ==============================================================================
@@ -52,7 +54,7 @@ DWORD WINAPI clnt_thread(LPVOID param)
 
 int flow_serv_undefined_flow(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(T, p_clnt->username);
 	PRINT_ERROR(E_FLOW);
 	return STATE_ABORT_THREAD;
 }
@@ -61,7 +63,7 @@ int flow_serv_undefined_flow(struct clnt_args *p_clnt)
 
 flow_serv_disconnect(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(T, p_clnt->username);
 	assert(p_clnt->connected);
 
 	// int res;
@@ -81,8 +83,13 @@ flow_serv_disconnect(struct clnt_args *p_clnt)
 
 flow_serv_thread_cleanup(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
+	if (p_clnt->username)
+		DBG_TRACE_FUNC(T, p_clnt->username);
+
 	assert(!p_clnt->connected);
+
+	if (p_clnt->username)
+		free(p_clnt->username);
 
 	if (closesocket(p_clnt->skt) == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
@@ -94,11 +101,11 @@ flow_serv_thread_cleanup(struct clnt_args *p_clnt)
 
 int flow_serv_abort_thread(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
-
 	/* disconnect thread, errors dont affect flow */
-	if (p_clnt->connected)
+	if (p_clnt->connected) {
+		DBG_TRACE_FUNC(T, p_clnt->username);
 		flow_serv_disconnect(p_clnt);
+	}
 
 	/* cleanup thread, errors dont affect flow */
 	flow_serv_thread_cleanup(p_clnt);
@@ -108,25 +115,9 @@ int flow_serv_abort_thread(struct clnt_args *p_clnt)
 }
 
 
-// int flow_clnt_recieve_failure(struct client_env *p_env)
-// {
-// 	DBG_FUNC_STAMP();
-// 	switch (p_env->last_error)
-// 	{
-// 	case E_TIMEOUT:
-// 		UI_PRINT(UI_CONNECT_FAIL, p_env->serv_ip, p_env->serv_port);
-// 		return STATE_CONNECT_FAILURE;
-// 	default:
-// 		PRINT_ERROR(p_env->last_error);
-// 		return STATE_THREAD_EXIT;
-// 	}	
-// }
-
-
-
 flow_serv_main_menu(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(T, p_clnt->username);
 	assert(p_clnt->connected);
 	
 	int res;
@@ -166,7 +157,7 @@ flow_serv_main_menu(struct clnt_args *p_clnt)
 
 int flow_serv_connect_approve(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(T, p_clnt->username);
 	assert(p_clnt->connected);
 	int res;
 	
@@ -181,8 +172,8 @@ int flow_serv_connect_approve(struct clnt_args *p_clnt)
 
 int flow_serv_connect_deny(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
-	assert(!p_clnt->connected);
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	assert(p_clnt->connected);
 	
 	int res;
 	
@@ -195,7 +186,7 @@ int flow_serv_connect_deny(struct clnt_args *p_clnt)
 
 int flow_serv_connect(struct clnt_args *p_clnt)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_INIT(S, SERVER);
 	assert(!p_clnt->connected);
 	
 	struct msg *p_msg = NULL;
@@ -213,11 +204,23 @@ int flow_serv_connect(struct clnt_args *p_clnt)
 		return STATE_THREAD_CLEANUP;
 	}
 
+	p_clnt->username = calloc(strlen(p_msg->param_lst[0]) + 1, sizeof(char));
+	if (!p_clnt->username) {
+		PRINT_ERROR(E_STDLIB);
+		free_msg(&p_msg);
+		return STATE_THREAD_CLEANUP;
+	}
+	memcpy(p_clnt->username, p_msg->param_lst[0], strlen(p_msg->param_lst[0]));
+	DBG_TRACE_INIT(T, p_clnt->username);
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_MSG(T, p_clnt->username, p_msg);
+
+	p_clnt->connected = true;
+
 	wait_code = WaitForSingleObject(p_clnt->p_env->h_players_smpr, 5000);
 	switch (wait_code) {
 	case WAIT_OBJECT_0:
 		state = STATE_CONNECT_APPROVE;
-		p_clnt->connected = true;
 		break;
 	case WAIT_TIMEOUT:
 		state = STATE_CONNECT_DENY;

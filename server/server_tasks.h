@@ -62,6 +62,7 @@ struct clnt_args
 	int last_err;
 	int skt;
 	struct serv_env *p_env;
+	char *username;
 	bool connected;
 	bool playing;
 };
@@ -193,6 +194,11 @@ int server_send_msg(struct clnt_args *p_clnt, int type,
  ******************************************************************************
  */
 int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec);
+
+
+
+int server_destroy_clients(struct serv_env *p_env);
+
 
 
 #endif // __SERVER_TASKS_H__

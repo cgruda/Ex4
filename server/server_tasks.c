@@ -8,7 +8,8 @@
  * by: Chaim Gruda
  *     Nir Beiber
  */
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
+#define _CRT_SECURE_NO_WARNINGS		// FIXME:
 
 #pragma comment(lib, "ws2_32.lib")
 #include "winsock2.h"
@@ -41,7 +42,6 @@ void print_usage()
 
 int check_input(struct serv_env *p_env, int argc, char** argv)
 {
-	DBG_PRINT("check_input\n");
 	int ret_val = E_SUCCESS;
 	int port;
 
@@ -174,6 +174,7 @@ serv_ctrl_init(struct serv_env *p_env)
 
 int server_init(struct serv_env *p_env)
 {
+	DBG_TRACE_INIT(S, SERVER);
 	int res;
 
 	/* quit logic init */
@@ -191,7 +192,7 @@ int server_init(struct serv_env *p_env)
 	if (res != E_SUCCESS)
 		return res;
 
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(S, SERVER);
 	return E_SUCCESS;
 }
 
@@ -216,12 +217,8 @@ bool server_quit(struct serv_env *p_env) // TODO: split 2
 		return true;
 	}
 
-	/*
-	 * if command is NOT "exit" - reset read event
-	 * and start a new asynchronous read. else, signal
-	 * runing threads to end and wait for them, then return
-	 * true to signal main thread it can do cleanup
-	 */
+	/* if command is NOT "exit" - reset read event
+	 * and start a new asynchronous read. else */
 	if (strncmp(p_env->buffer, "exit", 5)) { // FIXME: exitXXX...
 		if (!ResetEvent(p_env->olp_stdin.hEvent)) {
 			PRINT_ERROR(E_WINAPI);
@@ -236,34 +233,42 @@ bool server_quit(struct serv_env *p_env) // TODO: split 2
 		}
 		return false;
 	} else {
-		/* set abort event */
-		if (!SetEvent(p_env->h_abort_evt)) {
-			PRINT_ERROR(E_WINAPI);
-			p_env->last_err = E_WINAPI;
-			return true;
-		}
-		/* wait for threads, quit in any case*/
-		if (p_env->h_clnt_thread) {
-			wait_code = WaitForSingleObject(p_env->h_clnt_thread, 60000); // FIXME: more threads
-			switch (wait_code) {
-			case WAIT_OBJECT_0:
-				break;
-			case WAIT_TIMEOUT:
-				p_env->last_err = E_TIMEOUT;
-				break;
-			case WAIT_FAILED:
-				PRINT_ERROR(E_WINAPI);
-				/* fall through */
-			default:
-				p_env->last_err = E_WINAPI;
-				break;
-			}
-		}
-		/* signal main to quit */
-		DBG_PRINT("server_quit = true\n");
+		DBG_TRACE_STR(S, SERVER, "server_quit!");	
 		return true;
 	}
 }
+
+
+int server_destroy_clients(struct serv_env *p_env)
+{
+	DBG_TRACE_FUNC(S, SERVER);
+	DWORD wait_code;
+	
+	/* set abort event */
+	if (!SetEvent(p_env->h_abort_evt)) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	/* wait for threads, quit in any case*/
+	if (p_env->h_clnt_thread) {
+		wait_code = WaitForSingleObject(p_env->h_clnt_thread, 60000); // FIXME: more threads
+		switch (wait_code) {
+		case WAIT_OBJECT_0:
+			break;
+		case WAIT_TIMEOUT:
+			return E_TIMEOUT;
+		case WAIT_FAILED:
+			PRINT_ERROR(E_WINAPI);
+			/* fall through */
+		default:
+			return E_WINAPI;
+		}
+	}
+
+	return E_SUCCESS;
+}
+
 
 
 int serv_clnt_connect(struct serv_env *p_env)
@@ -295,7 +300,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 			PRINT_ERROR(E_WINSOCK);
 			return E_FAILURE;
 		}
-		DBG_PRINT("new connection\n");
+		DBG_TRACE_STR(S, SERVER, "connection accepted");
 
 		/* alloc mem for handling connection */
 		clnt_args = calloc(1, sizeof(*clnt_args));
@@ -330,7 +335,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 		}
 
 		/* handle connection in new thread */
-		DBG_PRINT("creating thread\n");
+		DBG_TRACE_STR(S, SERVER, "creating thread");
 		p_env->h_clnt_thread = CreateThread(NULL, 0, clnt_thread, (LPVOID)clnt_args, 0, NULL);
 		if (!p_env->h_clnt_thread) {
 			PRINT_ERROR(E_WINAPI);
@@ -366,8 +371,8 @@ bool server_check_abort(struct serv_env *p_env)
 
 int server_cleanup(struct serv_env *p_env)
 {
-	DBG_FUNC_STAMP();
-	int ret_val = E_SUCCESS;
+	DBG_TRACE_FUNC(S, SERVER);
+	int ret_val = p_env->last_err;
 
 	if (p_env->olp_stdin.hEvent) {
 		if (!CloseHandle(p_env->olp_stdin.hEvent)) {
@@ -421,7 +426,7 @@ int server_cleanup(struct serv_env *p_env)
 
 int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char *p2, char *p3)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(T, p_clnt->username);
 	struct msg *p_msg = NULL;
 	int res;
 
@@ -432,6 +437,7 @@ int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char
 
 	/* send message */
 	res = send_msg(p_clnt->skt, &p_msg);
+	DBG_TRACE_MSG(T, p_clnt->username, p_msg);
 
 	/* free message */
 	free_msg(&p_msg);
@@ -441,7 +447,8 @@ int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char
 
 int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec)
 {
-	DBG_FUNC_STAMP();
+	if (p_clnt->connected)
+		DBG_TRACE_FUNC(T, p_clnt->username);
 	
 	TIMEVAL tv;
 	int res;
@@ -461,6 +468,9 @@ int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_
 		else
 			break;
 	}
+
+	if (p_clnt->connected)
+		DBG_TRACE_MSG(T, p_clnt->username, *p_p_msg);
 
 	return res;
 }

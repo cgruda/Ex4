@@ -25,6 +25,7 @@
  */
 
 #pragma comment(lib, "ws2_32.lib")
+#define _CRT_SECURE_NO_WARNINGS
 
 /*
  ==============================================================================
@@ -106,3 +107,61 @@ int my_atoi(char *str, int *p_result)
 
 	return E_SUCCESS;
 }
+
+#if DBG_TRACE
+
+char *dbg_trace_mode_2_str[DBG_TRACE_MODE_MAX] =
+{
+	[C] = "client_",
+	[T] = "thread_",
+	[S] = "",
+};
+
+char *dbg_trace_get_path(int mode, char *name)
+{
+	char *path = calloc(100, sizeof(char));
+	char *pre  = dbg_trace_mode_2_str[mode];
+	if (!path) {
+		PRINT_ERROR(E_INTERNAL);
+		exit(E_FAILURE);
+	}
+
+	memcpy(path, "trace\\", strlen("trace\\"));
+	memcpy(path + strlen(path), pre, strlen(pre));
+	memcpy(path + strlen(path), name, strlen(name));
+	memcpy(path + strlen(path), ".txt", strlen(".txt"));
+
+	return path;
+}
+
+void dbg_trace_init(int mode, char *name)
+{
+	char *path = dbg_trace_get_path(mode, name);
+
+	FILE *fp = fopen(path, "w");
+	if (!fp) {
+		PRINT_ERROR(E_INTERNAL);
+		exit(E_FAILURE);
+	}
+
+	fclose(fp);
+	free(path);
+}
+
+void dbg_trace_log(int mode, char *name, char *str)
+{
+	char *path = dbg_trace_get_path(mode, name);
+
+	FILE *fp = fopen(path, "a");
+	if (!fp) {
+		PRINT_ERROR(E_INTERNAL);
+		exit(E_FAILURE);
+	}
+
+	fprintf(fp, str);
+
+	fclose(fp);
+	free(path);
+}
+
+#endif

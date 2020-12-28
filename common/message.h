@@ -11,6 +11,8 @@
  *     Nir Beiber
  */
 
+#include "tasks.h"
+
 #ifndef __MESSAGES_H__
 #define __MESSAGES_H__
 
@@ -129,5 +131,11 @@ int send_msg(int skt, struct msg **p_p_msg);
  ******************************************************************************
  */
 int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout);
+
+
+#if DBG_TRACE
+char *dbg_trace_msg(struct msg *p_msg);
+#endif
+
 
 #endif // __MESSAGES_H__

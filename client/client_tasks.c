@@ -8,6 +8,8 @@
  * by: Chaim Gruda
  *     Nir Beiber
  */
+#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
+#define _CRT_SECURE_NO_WARNINGS
 
 /*
  ==============================================================================
@@ -38,7 +40,6 @@ void print_usage()
 
 int check_input(struct client_env *p_env, int argc, char** argv)
 {
-	DBG_FUNC_STAMP();
 	int ret_val = E_SUCCESS, res;
 	int port;
 
@@ -83,7 +84,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 
 int client_init(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_INIT(C, p_env->username);
 	WSADATA	wsa_data;
 	int res;
 
@@ -106,7 +107,7 @@ int client_init(struct client_env *p_env)
 
 int cilent_send_msg(struct client_env *p_env, int type, char *param)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	struct msg *p_msg = NULL;
 	int res;
 
@@ -118,6 +119,8 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 	/* send message */
 	res = send_msg(p_env->skt, &p_msg);
 
+	DBG_TRACE_MSG(C, p_env->username, p_msg);
+
 	/* free message */
 	free_msg(&p_msg);
 
@@ -126,7 +129,7 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 
 int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	int res;
 	TIMEVAL tv = {0};
 
@@ -135,13 +138,15 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 	if (res != E_SUCCESS)
 		p_env->last_error = res;
 	
+	DBG_TRACE_MSG(C, p_env->username, *p_p_msg);
+
 	return res;
 }
 
 
 int client_cleanup(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	int ret_val = p_env->last_error;
 
 	if (WSACleanup()) {

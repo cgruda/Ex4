@@ -20,6 +20,8 @@
  * by: Chaim Gruda
  *     Nir Beiber
  */
+#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
+#define _CRT_SECURE_NO_WARNINGS
 
 /*
  ==============================================================================
@@ -43,7 +45,7 @@
 
 int flow_clnt_connect_attempt(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	assert(!p_env->approved);
 
 	int res;
@@ -72,7 +74,7 @@ int flow_clnt_connect_attempt(struct client_env *p_env)
 
 int flow_clnt_disconnect(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	assert(p_env->approved);
 
 	/* send disconncet message. if error occures there
@@ -89,7 +91,7 @@ int flow_clnt_disconnect(struct client_env *p_env)
 
 int flow_clnt_connect_failure(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	int res;
 
 	/* send disconnect if was approved. result
@@ -116,7 +118,7 @@ int flow_clnt_connect_failure(struct client_env *p_env)
 
 flow_clnt_reconnect_menu(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	int choice;
 
 	/* print menu and await choice */
@@ -139,6 +141,7 @@ flow_clnt_reconnect_menu(struct client_env *p_env)
 
 int flow_clnt_client_request(struct client_env *p_env)
 {
+	DBG_TRACE_FUNC(C, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
@@ -178,7 +181,7 @@ int flow_clnt_client_request(struct client_env *p_env)
 
 int flow_clnt_connect_denied(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	assert(!p_env->approved);
 
 	/* print message */
@@ -190,7 +193,7 @@ int flow_clnt_connect_denied(struct client_env *p_env)
 
 int flow_clnt_connect_approved(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	assert(!p_env->approved);
 
 	struct msg *p_msg;
@@ -225,7 +228,7 @@ int flow_clnt_connect_approved(struct client_env *p_env)
 
 int flow_clnt_main_menu(struct client_env *p_env)
 {	
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	assert(p_env->approved);
 	int choice;
 
@@ -249,7 +252,7 @@ int flow_clnt_main_menu(struct client_env *p_env)
 
 int flow_clnt_undefined_flow(struct client_env *p_env)
 {
-	DBG_FUNC_STAMP();
+	DBG_TRACE_FUNC(C, p_env->username);
 	PRINT_ERROR(E_FLOW);
 	
 	/* handle accorsing to approval state */

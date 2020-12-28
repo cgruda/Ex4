@@ -9,6 +9,7 @@
  *     Nir Beiber
  */
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS // FIXME:
 
 #pragma comment(lib, "ws2_32.lib")
 // include libraries
@@ -38,28 +39,31 @@ int main(int argc, char **argv)
 	struct serv_env env = {0};
 	int ret_val = E_FAILURE;
 
-	if (check_input(&env, argc, argv))
-		return E_FAILURE;
+	/* check program input */
+	ret_val = check_input(&env, argc, argv);
+	if (ret_val != E_SUCCESS)
+		return ret_val;
 
-	/* do-while(0) for easy cleanup */
-	do { // TODO: fix
-		if (server_init(&env))
-			break;
+	/* initalize resources */
+	ret_val = server_init(&env);
 
-		/* execution loop */
-		while (!server_quit(&env)) {
+	if (ret_val == E_SUCCESS) {
+
+		while (1) {
 			
-			if(serv_clnt_connect(&env))
+			if(serv_clnt_connect(&env) != E_SUCCESS)
+				break;
+			
+			if (server_quit(&env))
 				break;
 		}
 
-		ret_val = E_SUCCESS;
+		env.last_err = server_destroy_clients(&env);
+	}
+	
+	/* free server resources */
+	ret_val = server_cleanup(&env);
 
-	} while (0);
-
-	if (server_cleanup(&env))
-		ret_val = E_FAILURE;
-
-	printf("--- SERVER EXIT %s ---\n", ret_val ? "FAILURE" : "SUCCESS");
+	printf("--- SERVER EXIT 0x%x ---\n", ret_val);
 	return ret_val;
 }
