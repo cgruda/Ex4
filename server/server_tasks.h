@@ -37,7 +37,8 @@
 #define ARGC           3
 
 
-#define MAX_PLAYERS 2
+#define MAX_PLAYERS      2
+#define MAX_CONNECTIONS (MAX_PLAYERS + 1)
 
 /*
  ==============================================================================
@@ -59,6 +60,7 @@
 
 struct clnt_args
 {
+	int id;
 	int last_err;
 	int skt;
 	struct serv_env *p_env;
@@ -80,7 +82,7 @@ struct serv_env
 	// quit server params
 	HANDLE h_file_stdin;
 	OVERLAPPED olp_stdin;
-	char buffer[7];
+	char buffer[7]; // FIXME:
 
 	// server handling params
 	WSADATA	wsa_data;
@@ -96,6 +98,10 @@ struct serv_env
 	// clients
 	HANDLE h_clnt_thread; // FIXME: need to support more tham 1. possibly use realloc
 	int clnt_cnt;
+	DWORD thread_bitmap;
+	struct clnt_args clnt_args[MAX_CONNECTIONS];
+	HANDLE h_clnt_thread_new[MAX_CONNECTIONS];
+
 	// client handling
 	// struct player player_db[MAX_PLAYERS];
 	// int player_cnt;
@@ -199,6 +205,7 @@ int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_
 
 int server_destroy_clients(struct serv_env *p_env);
 
+int server_check_thread_status(struct serv_env *p_env, int ms);
 
 
 #endif // __SERVER_TASKS_H__

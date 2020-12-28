@@ -168,6 +168,8 @@ serv_ctrl_init(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
+	p_env->thread_bitmap = 0xFFFFFFF8; // FIXME: allow three threads to be created
+
 	return E_SUCCESS;
 }
 
@@ -242,7 +244,7 @@ bool server_quit(struct serv_env *p_env) // TODO: split 2
 int server_destroy_clients(struct serv_env *p_env)
 {
 	DBG_TRACE_FUNC(S, SERVER);
-	DWORD wait_code;
+	int res;
 	
 	/* set abort event */
 	if (!SetEvent(p_env->h_abort_evt)) {
@@ -250,23 +252,9 @@ int server_destroy_clients(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
-	/* wait for threads, quit in any case*/
-	if (p_env->h_clnt_thread) {
-		wait_code = WaitForSingleObject(p_env->h_clnt_thread, 60000); // FIXME: more threads
-		switch (wait_code) {
-		case WAIT_OBJECT_0:
-			break;
-		case WAIT_TIMEOUT:
-			return E_TIMEOUT;
-		case WAIT_FAILED:
-			PRINT_ERROR(E_WINAPI);
-			/* fall through */
-		default:
-			return E_WINAPI;
-		}
-	}
+	res = server_check_thread_status(p_env, 200);
 
-	return E_SUCCESS;
+	return res;
 }
 
 
@@ -275,8 +263,10 @@ int serv_clnt_connect(struct serv_env *p_env)
 {
 	int res;
 	int new_skt;
-	struct clnt_args *clnt_args = NULL;
+	struct clnt_args *p_clnt_args = NULL;
+	HANDLE *p_h_clnt_thread = NULL;
 	FD_SET readfs;
+	DWORD idx;
 	TIMEVAL tv = {0, 1000}; // FIXME:
 
 	// char buffer[100];
@@ -293,59 +283,81 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 	/* socket is signald */
 	if (res) {
-		
+
+		/* check if more connections can be accepted */
+		if (!BitScanForward(&idx, ~p_env->thread_bitmap)) {
+			// DBG_TRACE_STR(S, SERVER, "max TCP connections (%d)! incoming connection refused", MAX_CONNECTIONS);
+			DBG_TRACE_STR(S, SERVER, "max TCP connections ! incoming connection refused");
+			return E_SUCCESS;
+		}
+
 		/* accept incoming connection */
 		new_skt = accept(p_env->serv_skt, NULL, NULL);
 		if (new_skt == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
 			return E_FAILURE;
 		}
-		DBG_TRACE_STR(S, SERVER, "connection accepted");
 
-		/* alloc mem for handling connection */
-		clnt_args = calloc(1, sizeof(*clnt_args));
-		if (clnt_args == NULL) {
-			PRINT_ERROR(E_STDLIB);
-			return E_STDLIB;
-		}
-		clnt_args->skt = new_skt;
-		clnt_args->p_env = p_env;
+		/* set client params */
+		p_clnt_args = &p_env->clnt_args[idx];
+		memset(p_clnt_args, 0, sizeof(*p_clnt_args));
+		p_clnt_args->id = idx;
+		p_clnt_args->skt = new_skt;
+		p_clnt_args->p_env = p_env;
 
-		// FIXME: this is temporary logic (only single thread infrastructure exists)
-		if (p_env->h_clnt_thread) {
-			DWORD wait_code = WaitForSingleObject(p_env->h_clnt_thread, 20000);
-			switch (wait_code) {
-			case WAIT_FAILED:
-				PRINT_ERROR(E_WINAPI);
-				return E_WINAPI;
-			case WAIT_TIMEOUT:
-				DBG_PRINT("thread still running.\n");
-				if (closesocket(clnt_args->skt) == SOCKET_ERROR) {
-					PRINT_ERROR(E_WINSOCK);
-					return E_WINSOCK;
-				}
-				return E_SUCCESS;
-			case WAIT_OBJECT_0:
-				break;
-			}
-			if (!CloseHandle(p_env->h_clnt_thread)) {
-				PRINT_ERROR(E_WINAPI);
-				return E_WINAPI;
-			}
-		}
-
-		/* handle connection in new thread */
-		DBG_TRACE_STR(S, SERVER, "creating thread");
-		p_env->h_clnt_thread = CreateThread(NULL, 0, clnt_thread, (LPVOID)clnt_args, 0, NULL);
-		if (!p_env->h_clnt_thread) {
+		/* create new thread to handle connection */
+		p_h_clnt_thread = &p_env->h_clnt_thread_new[idx];
+		*p_h_clnt_thread = CreateThread(NULL, 0, clnt_thread, (LPVOID)p_clnt_args, 0, NULL);
+		if (!*p_h_clnt_thread) {
 			PRINT_ERROR(E_WINAPI);
-			if (closesocket(clnt_args->skt) == SOCKET_ERROR) {
+			if (closesocket(p_clnt_args->skt) == SOCKET_ERROR) {
 				PRINT_ERROR(E_WINSOCK);
-				return E_WINSOCK; // FIXME: best solution?
+				return E_WINSOCK;
 			}
 			return E_WINAPI;
 		}
-		p_env->clnt_cnt++;
+
+		/* mark thread handle as taken */
+		SET_BIT(p_env->thread_bitmap, idx);
+		DBG_TRACE_STR(S, SERVER, "TCP connection accepted - passed to new thread");
+		// DBG_TRACE_STR(S, SERVER, "TCP connection accepted - passed to new thread %d", idx);
+	}
+
+	return E_SUCCESS;
+}
+
+
+int server_check_thread_status(struct serv_env *p_env, int ms)
+{
+	DWORD wait_code;
+	HANDLE *p_h_clnt_thread = NULL;
+
+	for (int idx = 0; idx < MAX_CONNECTIONS; idx++) {
+
+		if (!TEST_BIT(p_env->thread_bitmap, idx))
+			continue;
+		
+		p_h_clnt_thread = &p_env->h_clnt_thread_new[idx];
+		wait_code = WaitForSingleObject(*p_h_clnt_thread, ms);
+		switch (wait_code)
+		{
+		case WAIT_TIMEOUT:
+			break;
+		case WAIT_OBJECT_0:
+			if (!CloseHandle(*p_h_clnt_thread)) {
+				PRINT_ERROR(E_WINAPI);
+				return E_WINAPI;
+			}
+			DBG_TRACE_STR(S, SERVER, "TCP connection ended - thread was closed");
+			// DBG_TRACE_STR(S, SERVER, "TCP connection ended - thread %d was closed", idx);
+			CLR_BIT(p_env->thread_bitmap, idx);
+			break;
+		case WAIT_FAILED:
+			/* fall through */
+		default:
+			PRINT_ERROR(E_WINAPI);
+			return E_WINAPI;
+		}
 	}
 
 	return E_SUCCESS;

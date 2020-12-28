@@ -86,8 +86,6 @@ flow_serv_thread_cleanup(struct clnt_args *p_clnt)
 	if (p_clnt->username)
 		DBG_TRACE_FUNC(T, p_clnt->username);
 
-	assert(!p_clnt->connected);
-
 	if (p_clnt->username)
 		free(p_clnt->username);
 
@@ -122,7 +120,7 @@ flow_serv_main_menu(struct clnt_args *p_clnt)
 	
 	int res;
 	struct msg *p_msg;
-	int state;
+	int next_state;
 
 	res = server_send_msg(p_clnt, MSG_SERVER_MAIN_MENU, NULL, NULL, NULL, NULL);
 	if (res != E_SUCCESS) {
@@ -139,19 +137,19 @@ flow_serv_main_menu(struct clnt_args *p_clnt)
 	switch (p_msg->type)
 	{
 	case MSG_CLIENT_VERSUS:
-		state = STATE_DISCONNECT; // FIXME: temporary
+		next_state = STATE_DISCONNECT; // FIXME: temporary
 		/* code */
 		break;
 	case MSG_CLIENT_DISCONNECT:
-		state = STATE_DISCONNECT;
+		next_state = STATE_DISCONNECT;
 		break;
 	default:
-		state = STATE_UNDEFINED_FLOW;
+		next_state = STATE_UNDEFINED_FLOW;
 		break;
 	}
 
 	free_msg(&p_msg);
-	return STATE_THREAD_EXIT;
+	return next_state;
 }
 
 
@@ -186,7 +184,6 @@ int flow_serv_connect_deny(struct clnt_args *p_clnt)
 
 int flow_serv_connect(struct clnt_args *p_clnt)
 {
-	DBG_TRACE_INIT(S, SERVER);
 	assert(!p_clnt->connected);
 	
 	struct msg *p_msg = NULL;

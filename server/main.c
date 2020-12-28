@@ -54,6 +54,9 @@ int main(int argc, char **argv)
 			if(serv_clnt_connect(&env) != E_SUCCESS)
 				break;
 			
+			if (server_check_thread_status(&env, 0) != E_SUCCESS)
+				break;
+
 			if (server_quit(&env))
 				break;
 		}
