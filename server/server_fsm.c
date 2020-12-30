@@ -84,7 +84,9 @@ flow_serv_disconnect(struct client *p_clnt)
 
 	// int res;
 
-	// what if during game??
+	if (p_clnt->playing) {
+		game_session_end(p_clnt); // FIXME: another look needed
+	}
 
 	if (!ReleaseSemaphore(p_clnt->p_env->h_players_smpr, 1, NULL)) {
 		PRINT_ERROR(E_WINSOCK);
@@ -158,9 +160,10 @@ flow_serv_main_menu(struct client *p_clnt)
 int flow_serv_ask_for_game(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
-	int res, next_state = STATE_ABORT_THREAD;
+	int res, next_state;
 	struct game *p_game = NULL;
-	
+	char buff[25] = {0}; // FIXME:
+
 	/* enter a game */
 	res = game_session_start(p_clnt);
 	if (res != E_SUCCESS) {
@@ -168,20 +171,80 @@ int flow_serv_ask_for_game(struct client *p_clnt)
 		return STATE_ABORT_THREAD;
 	}
 
-	char buff[25] = {0};
 	memcpy(buff, p_clnt->username, strlen(p_clnt->username));
 
-	res = session_sequece(p_clnt, buff);
-	if (res == E_TIMEOUT) {
+	res = session_sequence(p_clnt, buff);
+	switch (res) {
+	case E_TIMEOUT:
 		res = game_session_end(p_clnt);
-		if (res != E_SUCCESS)
-			return STATE_ABORT_THREAD;
-		return STATE_NO_OPPONENTS;
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			next_state = STATE_ABORT_THREAD;
+			break;
+		}
+		next_state = STATE_NO_OPPONENTS;
+		break;
+	case E_SUCCESS:
+		p_clnt->opponent_username = calloc(strlen(buff) + 1, sizeof(char));
+		if (!p_clnt->opponent_username) {
+			p_clnt->last_err = E_STDLIB;
+			next_state = STATE_ABORT_THREAD;
+			break;
+		}
+		memcpy(p_clnt->opponent_username, buff, strlen(buff));
+		next_state = STATE_GAME_INVITE;
+		break;
+	default:
+		p_clnt->last_err = res;
+		next_state = STATE_ABORT_THREAD;
+		break;
 	}
-
 
 	return next_state;
 }
+
+
+int flow_serv_invite(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	int res;
+	struct msg *p_msg = NULL;
+
+	/* send invite */
+	res = server_send_msg(p_clnt, MSG_SERVER_INVITE, p_clnt->opponent_username, NULL, NULL, NULL);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	/* send setup request */
+	res = server_send_msg(p_clnt, MSG_SERVER_SETUP_REQUEST, NULL, NULL, NULL, NULL);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	/* wait for client setup reponse */
+	res = server_recv_msg(p_clnt, &p_msg, MSG_TIMOUT_SEC_HUMAN_MAX);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	if (p_msg->type != MSG_CLIENT_SETUP) {
+		free_msg(&p_msg);
+		p_clnt->last_err = E_FLOW;
+		return STATE_ABORT_THREAD;
+	}
+
+	memcpy(p_clnt->setup_numbers, p_msg->param_lst[0], 4); // FIXME:
+	DBG_TRACE_STR(T, p_clnt->username, "setup: %s", p_clnt->setup_numbers);
+
+	free_msg(&p_msg);
+	return STATE_ABORT_THREAD;
+}
+
+
 
 
 int flow_serv_no_opponents(struct client *p_clnt)
@@ -295,6 +358,6 @@ int(*server_fsm[STATE_MAX])(struct client *p_clnt) =
 	[STATE_MAIN_MENU]       = flow_serv_main_menu,
 	[STATE_THREAD_CLEANUP]  = flow_serv_thread_cleanup,
 	[STATE_ASK_FOR_GAME]    = flow_serv_ask_for_game,
-	[STATE_GAME_INVITE]     = flow_serv_abort, // temp
+	[STATE_GAME_INVITE]     = flow_serv_invite, // temp
 	[STATE_NO_OPPONENTS]    = flow_serv_no_opponents,
 };

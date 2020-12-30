@@ -158,19 +158,22 @@ serv_ctrl_init(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
+	/* event for signal threads to abort */
 	p_env->h_abort_evt = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (p_env->h_players_smpr == NULL) {
+	if (p_env->h_abort_evt == NULL) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
 
+	/* mutex to sync game session update */
 	p_env->h_game_mtx = CreateMutex(NULL, FALSE, NULL);
 	if (p_env->h_game_mtx == NULL) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
 
-	p_env->thread_bitmap = THREAD_BITMAP_INIT_MASK; // FIXME: allow three threads to be created
+	/* bitmap for thread creation control */
+	p_env->thread_bitmap = THREAD_BITMAP_INIT_MASK;
 
 	return E_SUCCESS;
 }
@@ -780,6 +783,7 @@ int game_session_read(struct client *p_clnt, char *buffer)
 
 	HANDLE h_file = NULL;
 	int res;
+	buffer[0] = 0;
 
 	do {
 		h_file = CreateFileA(PATH_GAME_SESSION,
@@ -813,15 +817,15 @@ int game_session_read(struct client *p_clnt, char *buffer)
 		}
 	}
 
+	DBG_TRACE_STR(T, p_clnt->username, "read: %s", buffer);
 	return res;
-
 }
 
 
 
 
 
-int session_sequece(struct client *p_clnt, char *buffer)
+int session_sequence(struct client *p_clnt, char *buffer)
 {
 	struct game *p_game = &p_clnt->p_env->game;
 	int position = p_clnt->position;

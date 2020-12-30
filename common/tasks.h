@@ -31,10 +31,8 @@
 // debug prints enable
 #define DBG_ENABLE     1
 #define DBG_TRACE      1
-#define SERVER		"server"
+#define SERVER         "server"
 
-// for debug use
-#define __FILENAME__   (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 
 // times
 #define MS2US                1000
@@ -69,16 +67,17 @@ enum err_val
  * MACROS
  ==============================================================================
  */
-// debug stamp [file;line]
-#define DBG_STAMP()     printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
 
-
-// for debuging
 #if DBG_ENABLE
-#define DBG_PRINT(...)  do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
-#define DBG_FUNC_STAMP()  do {DBG_STAMP(); printf("$$$ %s\n", __func__);} while (0)
+#define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
+#define DBG_STAMP() printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
+#define DBG_PRINT(...) do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
+#define DBG_FUNC_STAMP() do {DBG_STAMP(); printf("%s\n", __func__);} while (0)
 #else
+#define __FILENAME__
 #define DBG_PRINT(...)
+#define DBG_FUNC_STAMP()
+#define DBG_STAMP()
 #endif
 
 // print error message
@@ -115,9 +114,6 @@ void print_error(int err_val);
 
 
 
-
-#if DBG_TRACE
-
 enum dbg_trace_mode
 {
 	C,
@@ -125,6 +121,8 @@ enum dbg_trace_mode
 	T,
 	DBG_TRACE_MODE_MAX,
 };
+
+#if DBG_TRACE
 
 #define DBG_TRACE_INIT(mode, name) dbg_trace_init(mode, name)
 // #define DBG_TRACE_LOG(mode, name, str) dbg_trace_log(mode, name, str)
@@ -148,13 +146,6 @@ enum dbg_trace_mode
 		DBG_TRACE_LOG(mode, name, "\n");						\
 	} while (0)
 
-
-// #define DBG_TRACE_STR(mode, name, str) do {							\
-// 		DBG_TRACE_STAMP(mode, name);							\
-// 		DBG_TRACE_LOG(mode, name, str);							\
-// 		DBG_TRACE_LOG(mode, name, "\n");						\
-// 	} while (0)
-
 #define DBG_TRACE_FUNC(mode, name) do { 							\
 		DBG_TRACE_STR(mode, name, __func__);						\
 	} while (0)
@@ -168,7 +159,13 @@ enum dbg_trace_mode
 char *dbg_trace_get_path(int mode, char *name);
 void dbg_trace_init(int mode, char *name);
 void dbg_trace_log(int mode, char *name, char *str);
-
+#else
+#define DBG_TRACE_INIT(mode, name)
+#define DBG_TRACE_LOG(mode, name, ...)
+#define DBG_TRACE_STAMP(mode, name)
+#define DBG_TRACE_STR(mode, name, ...)
+#define DBG_TRACE_FUNC(mode, name)
+#define DBG_TRACE_MSG(mode, name, p_msg)
 #endif
 
 

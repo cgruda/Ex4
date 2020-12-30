@@ -60,9 +60,6 @@ struct game
 {
 	bool valid;
 	HANDLE h_play_evt[2];
-	HANDLE h_game_session_file;
-	HANDLE h_game_mtx;
-	HANDLE h_game_abort_avt;
 };
 
 struct client
@@ -72,12 +69,12 @@ struct client
 	int skt;
 	struct serv_env *p_env;
 	char *username;
+	char setup_numbers[5]; // FIXME:
+	char opponent_numbers[5]; // FIXME:
 	char *opponent_username;
 	bool connected;
 	bool playing;
-	int game_session_offset;
 	HANDLE *play_evt;
-	HANDLE h_game_session_file;
 	int position;
 };
 
@@ -229,7 +226,7 @@ int server_check_thread_status(struct serv_env *p_env, int ms);
  ******************************************************************************
  */
 int game_session_start(struct client *p_clnt);
-int session_sequece(struct client *p_clnt, char *buffer);
+int session_sequence(struct client *p_clnt, char *buffer);
 int game_session_end(struct client *p_clnt);
 
 
