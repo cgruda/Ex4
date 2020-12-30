@@ -119,10 +119,8 @@ int new_msg_param(char **p_param_dst, char *param_src)
 	/* allocate param mem */
 	int mem_size = strlen(param_src) + 1;
 	*p_param_dst = calloc(mem_size, sizeof(char));
-	if (!*p_param_dst) {
-		PRINT_ERROR(E_STDLIB);
+	if (!*p_param_dst)
 		return E_STDLIB;
-	}
 
 	/* fill param */
 	memcpy(*p_param_dst, param_src, mem_size - 1);
@@ -141,10 +139,8 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 
 	/* allocate mem */
 	p_msg = calloc(1, sizeof(*p_msg));
-	if (p_msg == NULL) {
-		PRINT_ERROR(E_STDLIB);
+	if (p_msg == NULL)
 		return E_STDLIB;
-	}
 
 	/* parse message type */
 	p_msg->type = MSG_INVALID;
@@ -166,9 +162,8 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 	while(token = strtok_s(NULL, ";", &context)) {
 		idx = p_msg->param_cnt;
 		if (idx >= MSG_MAX_PARAMS) {
-			res = E_MESSAGE;
 			free_msg(&p_msg);
-			return res;
+			return E_MESSAGE;
 		}
 		res = new_msg_param(&p_msg->param_lst[idx], token);
 		if (res != E_SUCCESS) {
@@ -192,7 +187,7 @@ struct msg *new_msg(int type, char *p0, char *p1, char *p2, char *p3)
 	/* allocate message */
 	p_msg = calloc(1, sizeof(*p_msg));
 	if (p_msg == NULL) {
-		PRINT_ERROR(E_STDLIB);
+		PRINT_ERROR(E_STDLIB); // FIXME:
 		return NULL;
 	}
 
@@ -294,7 +289,6 @@ int send_msg(int skt, struct msg **p_p_msg)
 		buff_len = msg_buff_len(p_msg);
 		buffer = calloc(buff_len + 1, sizeof(*buffer)); // FIXME: +1 is temporary for debug only
 		if (buffer == NULL) {
-			PRINT_ERROR(E_STDLIB);
 			ret_val = E_STDLIB;
 			break;
 		}
@@ -303,9 +297,8 @@ int send_msg(int skt, struct msg **p_p_msg)
 		msg_2_buff(buffer, p_msg);
 
 		/* send message */
-		res = send(skt, buffer, buff_len, 0);
+		res = send(skt, buffer, buff_len + 1, 0); // FIXME: +1 needed for case of multiple messages
 		if (res == SOCKET_ERROR) { // FIXME: partial send
-			PRINT_ERROR(E_WINSOCK);
 			ret_val = E_WINSOCK;
 			break;
 		}
@@ -326,6 +319,7 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 {
 	char buff[100] = {0}; // FIXME:
 	int res, ret_val = E_SUCCESS;
+	int msg_len;
 	FD_SET readfs;
 
 	FD_ZERO(&readfs);
@@ -333,19 +327,27 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 
 	/* wait for message to arrive in socket */
 	res = select(0, &readfs, NULL, NULL, p_timeout);
-	if (!res) {
+	if (res == 0)
 		return E_TIMEOUT;
-	} else if (res == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
+	else if (res == SOCKET_ERROR)
 		return E_WINSOCK;
-	}
 
-	/* recieve message */ // FIXME: partial recv
-	res = recv(skt, buff, 100, 0);
-	if (res == SOCKET_ERROR) {
-		PRINT_ERROR(E_WINSOCK);
+	/* since server can send multiple messages at once,
+	 * first peek to determine up to where to read.
+	 * if the peer closed the socket gracfully and all
+	 * data was already read, than act as if got timeout */
+	res = recv(skt, buff, 100, MSG_PEEK);
+	if (res == 0)
+		return E_TIMEOUT;
+	if (res == SOCKET_ERROR)
 		return E_WINSOCK;
-	}
+
+	/* recieve message */
+	msg_len = strlen(buff);
+	memset(buff, 0, 100);
+	res = recv(skt, buff, msg_len + 1, 0);
+	if (res == SOCKET_ERROR)
+		return E_WINSOCK;
 
 	/* parse message */
 	res = buff_2_msg(buff, p_p_msg);

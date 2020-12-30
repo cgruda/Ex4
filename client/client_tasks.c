@@ -135,8 +135,6 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 
 	tv.tv_sec = timeout_sec;
 	res = recv_msg(p_p_msg, p_env->skt, &tv);
-	if (res != E_SUCCESS)
-		p_env->last_error = res;
 	
 	DBG_TRACE_MSG(C, p_env->username, *p_p_msg);
 

@@ -12,13 +12,13 @@
 #ifndef __SERVER_TASKS_H__
 #define __SERVER_TASKS_H__
 
+#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
+
 /*
  ==============================================================================
  * INCLUDES
  ==============================================================================
  */
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-
 
 #include <windows.h>
 #include <stdio.h>
@@ -34,23 +34,21 @@
  */
 
 // input arguments count
-#define ARGC           3
+#define ARGC                         3
 
+// 2 clients can be approved
+#define MAX_PLAYERS                  2
 
-#define MAX_PLAYERS      2
-#define MAX_CONNECTIONS (MAX_PLAYERS + 1)
+// allow 3 threads to be created
+#define MAX_CONNECTIONS              3
+#define THREAD_BITMAP_INIT_MASK      0xFFFFFFF8
 
-/*
- ==============================================================================
- * ENUMERATIONS
- ==============================================================================
- */
+// standard input value
+#define PATH_STDIN                   "CONIN$"
+#define PATH_GAME_SESSION            "GameSession.txt"
 
-/*
- ==============================================================================
- * MACROS
- ==============================================================================
- */
+#define FILE_SHARE_ALL     (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+#define GENERIC_READ_WRITE (GENERIC_READ | GENERIC_WRITE)
 
 /*
  ==============================================================================
@@ -58,53 +56,55 @@
  ==============================================================================
  */
 
-struct clnt_args
+struct game
+{
+	bool valid;
+	HANDLE h_play_evt[2];
+	HANDLE h_game_session_file;
+	HANDLE h_game_mtx;
+	HANDLE h_game_abort_avt;
+};
+
+struct client
 {
 	int id;
 	int last_err;
 	int skt;
 	struct serv_env *p_env;
 	char *username;
+	char *opponent_username;
 	bool connected;
 	bool playing;
+	int game_session_offset;
+	HANDLE *play_evt;
+	HANDLE h_game_session_file;
+	int position;
 };
-
-// struct player
-// {
-// 	int id;
-// 	int skt;
-// 	HANDLE h_thread;
-// 	bool wating_play;
-// };
 
 struct serv_env
 {
-	// quit server params
-	HANDLE h_file_stdin;
-	OVERLAPPED olp_stdin;
-	char buffer[7]; // FIXME:
-
 	// server handling params
 	WSADATA	wsa_data;
-	char *serv_ip;
-	unsigned short serv_port;
-	SOCKADDR_IN server;
 	int serv_skt;
+	char *serv_ip;
+	USHORT serv_port;
+	SOCKADDR_IN server;
 
 	// control params
 	HANDLE h_players_smpr;
 	HANDLE h_abort_evt;
+	HANDLE h_game_file;
+	HANDLE h_game_mtx;
+	HANDLE h_file_stdin;
+	OVERLAPPED olp_stdin;
+	char buffer[7]; // FIXME:
 
 	// clients
-	HANDLE h_clnt_thread; // FIXME: need to support more tham 1. possibly use realloc
-	int clnt_cnt;
 	DWORD thread_bitmap;
-	struct clnt_args clnt_args[MAX_CONNECTIONS];
-	HANDLE h_clnt_thread_new[MAX_CONNECTIONS];
+	struct client client[MAX_CONNECTIONS];
+	HANDLE h_clnt_thread[MAX_CONNECTIONS];
 
-	// client handling
-	// struct player player_db[MAX_PLAYERS];
-	// int player_cnt;
+	struct game game;
 
 	int last_err;
 };
@@ -117,16 +117,16 @@ struct serv_env
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
+ * @brief check program input
+ * @param p_env pointer to server enviroment
+ * @return E_SUCCESS on success
  ******************************************************************************
  */
 int check_input(struct serv_env *p_env, int argc, char **argv);
 
 /**
  ******************************************************************************
- * @brief check if exit command was given, and if did - abort all threads
+ * @brief check if exit command was given
  * @param p_env pointer to server env
  * @return true  - got exit or encountered errors (see p_env->last_err)
  *         false - otherwise
@@ -136,36 +136,37 @@ bool server_quit(struct serv_env *p_env);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
+ * @brief initilize server resources and start logic that checks exit command
+ * @param p_env pointer to server env
+ * @return E_SUCCESS on success
  ******************************************************************************
  */
 int server_init(struct serv_env *p_env);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
+ * @brief clenup all server resources
+ * @param p_env pointer to server env
+ * @return last error from p_env->last_err
  ******************************************************************************
  */
 int server_cleanup(struct serv_env *p_env);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
+ * @brief check if abort event was set by main thread
+ * @param p_env pointer to server env
+ * @return true or false
  ******************************************************************************
  */
 bool server_check_abort(struct serv_env *p_env);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
+ * @brief TCP connection entrance function: listens for new connections and
+ *        opens new thread if there are available resources.
+ * @param p_env pointer to server env
+ * @return E_SUCESS on success
  ******************************************************************************
  */
 int serv_clnt_connect(struct serv_env *p_env);
@@ -182,7 +183,7 @@ int serv_clnt_connect(struct serv_env *p_env);
  *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int server_send_msg(struct clnt_args *p_clnt, int type,
+int server_send_msg(struct client *p_clnt, int type,
 	char *p0, char *p1, char *p2, char *p3);
 
 /**
@@ -199,13 +200,37 @@ int server_send_msg(struct clnt_args *p_clnt, int type,
  *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec);
+int server_recv_msg(struct client *p_clnt, struct msg **p_p_msg, int timeout_sec);
 
-
-
+/**
+ ******************************************************************************
+ * @brief destroy threads handling clients one by one
+ * @param p_env pointer to server enviroment
+ * @return E_SUCCESS on success
+ ******************************************************************************
+ */
 int server_destroy_clients(struct serv_env *p_env);
 
+/**
+ ******************************************************************************
+ * @brief check if a thread has ended, and if it did free its resources to
+ *        allow new connections to utilize resources
+ * @param p_env pointer to server enviroment
+ * @return E_SUCCESS on success
+ ******************************************************************************
+ */
 int server_check_thread_status(struct serv_env *p_env, int ms);
+
+/**
+ ******************************************************************************
+ * @brief TODO:
+ * @param p_clnt pointer to client object
+ * @return E_SUCCESS on success
+ ******************************************************************************
+ */
+int game_session_start(struct client *p_clnt);
+int session_sequece(struct client *p_clnt, char *buffer);
+int game_session_end(struct client *p_clnt);
 
 
 #endif // __SERVER_TASKS_H__

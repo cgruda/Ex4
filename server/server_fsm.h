@@ -33,17 +33,19 @@
 enum state_clnt
 {
 	STATE_THREAD_EXIT,
-	STATE_CONNECT_ATTEMPT,
+	STATE_CONNECT,
 	STATE_CONNECT_FAILURE,
 	STATE_CONNECT_SUCCESS,
 	STATE_CONNECT_DENIED,
-	STATE_UNDEFINED_FLOW,
+	STATE_ABORT_THREAD,
 	STATE_DISCONNECT,
 	STATE_CONNECT_APPROVE,
 	STATE_CONNECT_DENY,
 	STATE_MAIN_MENU,
 	STATE_THREAD_CLEANUP,
-	STATE_ABORT_THREAD,
+	STATE_ASK_FOR_GAME,
+	STATE_GAME_INVITE,
+	STATE_NO_OPPONENTS,
 	STATE_MAX
 };
 
@@ -60,7 +62,7 @@ enum state_clnt
  ==============================================================================
  */
 
-int(*server_fsm[STATE_MAX])(struct clnt_args *p_clnt);
+int(*server_fsm[STATE_MAX])(struct client *p_clnt);
 
 /**
  ******************************************************************************

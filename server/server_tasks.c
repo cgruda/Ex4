@@ -39,8 +39,7 @@ void print_usage()
 	printf("\nusage:\n\tserver.exe <server ip> <port>\n\n");
 }
 
-
-int check_input(struct serv_env *p_env, int argc, char** argv)
+int check_input(struct serv_env *p_env, int argc, char **argv)
 {
 	int ret_val = E_SUCCESS;
 	int port;
@@ -72,19 +71,18 @@ int check_input(struct serv_env *p_env, int argc, char** argv)
 	return ret_val;
 }
 
-
 int serv_quit_init(struct serv_env *p_env)
 {
 	int res;
 	
 	/* create file handle for stdin */
-	p_env->h_file_stdin = CreateFileA("CONIN$",	// FIXME: stdin
-					  GENERIC_READ,
-					  FILE_SHARE_READ,
-					  NULL,
-					  OPEN_EXISTING,
-					  FILE_FLAG_OVERLAPPED,
-					  NULL);
+	p_env->h_file_stdin = CreateFileA(PATH_STDIN,              /* standard input    */
+					  GENERIC_READ,         /* we want to read   */
+					  FILE_SHARE_READ,      /* others may use    */
+					  NULL,                 /* default security  */
+					  OPEN_EXISTING,        /* stdin exists      */
+					  FILE_FLAG_OVERLAPPED, /* asynchronous read */
+					  NULL);                /* no template       */
 	if (p_env->h_file_stdin == INVALID_HANDLE_VALUE) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -97,13 +95,11 @@ int serv_quit_init(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
-	/* 
-	 * read stdin asynchronously for exit command.
+	/* read stdin asynchronously for exit command.
 	 * asynchronous read must always return false.
 	 * error is detected by checking WSA last error.
 	 * io_pending designates i/o pending completion,
-	 * and is thus not treated as an error.
-	 */ 
+	 * and is thus not treated as an error. */
 	res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin); // FIXME: 4
 	if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
 		PRINT_ERROR(E_WINAPI);
@@ -168,7 +164,13 @@ serv_ctrl_init(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
-	p_env->thread_bitmap = 0xFFFFFFF8; // FIXME: allow three threads to be created
+	p_env->h_game_mtx = CreateMutex(NULL, FALSE, NULL);
+	if (p_env->h_game_mtx == NULL) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	p_env->thread_bitmap = THREAD_BITMAP_INIT_MASK; // FIXME: allow three threads to be created
 
 	return E_SUCCESS;
 }
@@ -227,6 +229,11 @@ bool server_quit(struct serv_env *p_env) // TODO: split 2
 			p_env->last_err = E_WINAPI;
 			return true;
 		}
+		/* read stdin asynchronously for exit command.
+	 	 * asynchronous read must always return false.
+	 	 * error is detected by checking WSA last error.
+	 	 * io_pending designates i/o pending completion,
+	 	 * and is thus not treated as an error. */
 		res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
 		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
 			PRINT_ERROR(E_WINAPI);
@@ -263,7 +270,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 {
 	int res;
 	int new_skt;
-	struct clnt_args *p_clnt_args = NULL;
+	struct client *p_client = NULL;
 	HANDLE *p_h_clnt_thread = NULL;
 	FD_SET readfs;
 	DWORD idx;
@@ -278,7 +285,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 	res = select(p_env->serv_skt + 1, &readfs, NULL, NULL, &tv);
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
-		return E_FAILURE;
+		return E_WINSOCK;
 	}
 
 	/* socket is signald */
@@ -286,8 +293,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 		/* check if more connections can be accepted */
 		if (!BitScanForward(&idx, ~p_env->thread_bitmap)) {
-			// DBG_TRACE_STR(S, SERVER, "max TCP connections (%d)! incoming connection refused", MAX_CONNECTIONS);
-			DBG_TRACE_STR(S, SERVER, "max TCP connections ! incoming connection refused");
+			DBG_TRACE_STR(S, SERVER, "max TCP connections! incoming connection refused");
 			return E_SUCCESS;
 		}
 
@@ -295,22 +301,22 @@ int serv_clnt_connect(struct serv_env *p_env)
 		new_skt = accept(p_env->serv_skt, NULL, NULL);
 		if (new_skt == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
-			return E_FAILURE;
+			return E_WINSOCK;
 		}
 
 		/* set client params */
-		p_clnt_args = &p_env->clnt_args[idx];
-		memset(p_clnt_args, 0, sizeof(*p_clnt_args));
-		p_clnt_args->id = idx;
-		p_clnt_args->skt = new_skt;
-		p_clnt_args->p_env = p_env;
+		p_client = &p_env->client[idx];
+		memset(p_client, 0, sizeof(*p_client));
+		p_client->id = idx;
+		p_client->skt = new_skt;
+		p_client->p_env = p_env;
 
 		/* create new thread to handle connection */
-		p_h_clnt_thread = &p_env->h_clnt_thread_new[idx];
-		*p_h_clnt_thread = CreateThread(NULL, 0, clnt_thread, (LPVOID)p_clnt_args, 0, NULL);
+		p_h_clnt_thread = &p_env->h_clnt_thread[idx];
+		*p_h_clnt_thread = CreateThread(NULL, 0, clnt_thread, (LPVOID)p_client, 0, NULL);
 		if (!*p_h_clnt_thread) {
 			PRINT_ERROR(E_WINAPI);
-			if (closesocket(p_clnt_args->skt) == SOCKET_ERROR) {
+			if (closesocket(p_client->skt) == SOCKET_ERROR) {
 				PRINT_ERROR(E_WINSOCK);
 				return E_WINSOCK;
 			}
@@ -319,10 +325,9 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 		/* mark thread handle as taken */
 		SET_BIT(p_env->thread_bitmap, idx);
-		DBG_TRACE_STR(S, SERVER, "TCP connection accepted - passed to new thread");
-		// DBG_TRACE_STR(S, SERVER, "TCP connection accepted - passed to new thread %d", idx);
+		DBG_TRACE_STR(S, SERVER, "start TCP connection %d", idx);
 	}
-
+	
 	return E_SUCCESS;
 }
 
@@ -337,7 +342,7 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 		if (!TEST_BIT(p_env->thread_bitmap, idx))
 			continue;
 		
-		p_h_clnt_thread = &p_env->h_clnt_thread_new[idx];
+		p_h_clnt_thread = &p_env->h_clnt_thread[idx];
 		wait_code = WaitForSingleObject(*p_h_clnt_thread, ms);
 		switch (wait_code)
 		{
@@ -348,8 +353,7 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 				PRINT_ERROR(E_WINAPI);
 				return E_WINAPI;
 			}
-			DBG_TRACE_STR(S, SERVER, "TCP connection ended - thread was closed");
-			// DBG_TRACE_STR(S, SERVER, "TCP connection ended - thread %d was closed", idx);
+			DBG_TRACE_STR(S, SERVER, "end TCP connection   %d", idx);
 			CLR_BIT(p_env->thread_bitmap, idx);
 			break;
 		case WAIT_FAILED:
@@ -389,54 +393,54 @@ int server_cleanup(struct serv_env *p_env)
 	if (p_env->olp_stdin.hEvent) {
 		if (!CloseHandle(p_env->olp_stdin.hEvent)) {
 			PRINT_ERROR(E_WINAPI);
-			ret_val = E_FAILURE;
+			ret_val = E_WINAPI;
 		}
 	}
 
 	if (p_env->h_file_stdin) {
 		if (!CloseHandle(p_env->h_file_stdin)) {
 			PRINT_ERROR(E_WINAPI);
-			ret_val = E_FAILURE;
+			ret_val = E_WINAPI;
 		}
 	}
 
 	if (p_env->serv_skt != INVALID_SOCKET) {
 		if (closesocket(p_env->serv_skt) == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
-			ret_val = E_FAILURE;
+			ret_val = E_WINSOCK;
 		}
 	}
 
 	if (p_env->h_players_smpr) {
 		if (!CloseHandle(p_env->h_players_smpr)) {
 			PRINT_ERROR(E_WINAPI);
-			ret_val = E_FAILURE;
+			ret_val = E_WINAPI;
 		}
 	}
 
 	if (p_env->h_abort_evt) {
 		if (!CloseHandle(p_env->h_abort_evt)) {
 			PRINT_ERROR(E_WINAPI);
-			ret_val = E_FAILURE;
+			ret_val = E_WINAPI;
 		}
 	}
 
-	if (p_env->h_clnt_thread) { // FIXME: multiple threads
-		if (!CloseHandle(p_env->h_clnt_thread)) {
+	if (p_env->h_game_mtx) {
+		if (!CloseHandle(p_env->h_game_mtx)) {
 			PRINT_ERROR(E_WINAPI);
-			ret_val = E_FAILURE;
+			ret_val = E_WINAPI;
 		}
 	}
 
 	if (WSACleanup()) {
 		PRINT_ERROR(E_WINSOCK);
-		ret_val = E_FAILURE;
+		ret_val = E_WINSOCK;
 	}
 
 	return ret_val;
 }
 
-int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char *p2, char *p3)
+int server_send_msg(struct client *p_clnt, int type, char *p0, char *p1, char *p2, char *p3)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
 	struct msg *p_msg = NULL;
@@ -457,13 +461,13 @@ int server_send_msg(struct clnt_args *p_clnt, int type, char *p0, char *p1, char
 	return res;
 }
 
-int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_sec)
+int server_recv_msg(struct client *p_clnt, struct msg **p_p_msg, int timeout_sec)
 {
 	if (p_clnt->connected)
 		DBG_TRACE_FUNC(T, p_clnt->username);
 	
 	TIMEVAL tv;
-	int res;
+	int res = E_SUCCESS;
 
 	int incerments = timeout_sec * (SEC2MS / (MSG_TIME_INCERMENT_USEC / MS2US));
 
@@ -483,6 +487,407 @@ int server_recv_msg(struct clnt_args *p_clnt, struct msg **p_p_msg, int timeout_
 
 	if (p_clnt->connected)
 		DBG_TRACE_MSG(T, p_clnt->username, *p_p_msg);
+
+	return res;
+}
+
+
+
+
+
+
+enum player_position
+{
+	SLAVE,
+	MASTER,
+};
+
+
+
+
+
+int game_session_lock(HANDLE *mtx)
+{
+	DWORD wait_code;
+
+	wait_code = WaitForSingleObject(*mtx, 5000);
+	switch (wait_code) {
+	case WAIT_FAILED:
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	case WAIT_OBJECT_0:
+		return E_SUCCESS;
+	case WAIT_TIMEOUT:
+		return E_TIMEOUT;
+	default:
+		return E_FAILURE;
+	}
+}
+
+
+int game_session_release(HANDLE *mtx)
+{
+	int res;
+
+	res = ReleaseMutex(*mtx);
+	if (!res) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	return E_SUCCESS;
+}
+
+
+
+int destroy_game(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	int res = E_SUCCESS;
+	struct game *p_game = &p_clnt->p_env->game;
+
+	res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+	if (res != E_SUCCESS)
+		return res;
+
+	if (!CloseHandle(p_game->h_play_evt[0])) {
+		PRINT_ERROR(E_WINAPI);
+		res = E_WINAPI;
+	}
+	
+	if (!CloseHandle(p_game->h_play_evt[1])) {
+		PRINT_ERROR(E_WINAPI);
+		res = E_WINAPI;
+	}
+
+	if (!DeleteFileA(PATH_GAME_SESSION)) {
+		PRINT_ERROR(E_WINAPI);
+		res = E_WINAPI;
+	}
+
+	p_game->valid = false;
+	memset(p_game, 0, sizeof(*p_game));
+
+	res |= game_session_release(&p_clnt->p_env->h_game_mtx);
+
+	return res;
+}
+
+
+int leave_game(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+
+	int position = p_clnt->position;
+	struct game *p_game = &p_clnt->p_env->game;
+
+	p_clnt->play_evt = NULL;
+	p_clnt->playing = false;
+
+	return E_SUCCESS;
+}
+
+
+int game_session_end(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+
+	int res = E_SUCCESS;
+
+	struct game *p_game = &p_clnt->p_env->game;
+	int position = p_clnt->position;
+
+	if (position == MASTER) {
+		leave_game(p_clnt);
+		res = destroy_game(p_clnt);
+	} else {
+		leave_game(p_clnt);
+	}
+
+	return res;
+}
+
+
+
+
+
+int join_game(struct client *p_clnt, int position)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+
+	struct game *p_game = &p_clnt->p_env->game;
+
+	p_clnt->position = position;
+	p_clnt->play_evt = &p_game->h_play_evt[position];
+	p_clnt->playing = true;
+
+	return E_SUCCESS;
+}
+
+
+int create_game(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	struct game *p_game = &p_clnt->p_env->game;
+	HANDLE h_file = NULL;
+	int res;
+
+	do {
+		p_game->h_play_evt[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
+		if (!p_game->h_play_evt[0]) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		p_game->h_play_evt[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
+		if (!p_game->h_play_evt[1]) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		/* create session file */
+		h_file = CreateFileA(PATH_GAME_SESSION,     /* GameSession path    */
+				     0,                     /* no access needed    */
+				     0,                     /* no share            */
+				     NULL,                  /* default security    */
+				     CREATE_ALWAYS,         /* create file         */
+				     FILE_ATTRIBUTE_NORMAL, /* asynchronous read   */
+				     NULL);                 /* no template         */
+		if (!h_file) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+	
+		if (!CloseHandle(h_file)) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		res = E_SUCCESS;
+
+	} while (0);
+
+	if (res != E_SUCCESS) { // FIXME:
+		CloseHandle(p_game->h_play_evt[0]);
+		CloseHandle(p_game->h_play_evt[1]);
+		CloseHandle(h_file);
+		return res;
+	}
+
+	p_game->valid = true;
+	return E_SUCCESS;
+}
+
+int game_session_start(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	int res = E_SUCCESS;
+
+	/* aquaire game mutex */
+	res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+	if (res != E_SUCCESS)
+		return res;
+
+	if (!p_clnt->p_env->game.valid) {
+		res = create_game(p_clnt);
+		if (res == E_SUCCESS)
+			join_game(p_clnt, MASTER);
+	} else {
+		join_game(p_clnt, SLAVE);
+	}
+
+	res |= game_session_release(&p_clnt->p_env->h_game_mtx);
+
+	return res;
+}
+
+
+int game_session_write(struct client *p_clnt, char *data)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_STR(T, p_clnt->username, "write: %s", data);
+
+	HANDLE h_file = NULL;
+	int res;
+	int buffer_size;
+	char *buffer = NULL;
+
+	do {
+		h_file = CreateFileA(PATH_GAME_SESSION,
+				     GENERIC_WRITE,
+				     0,
+				     NULL,
+				     OPEN_EXISTING,
+				     FILE_ATTRIBUTE_NORMAL,
+				     NULL);
+		if (!h_file) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+
+		buffer_size = strlen(data) + 1;
+		buffer = calloc(buffer_size, 1);
+		if (!buffer) {
+			PRINT_ERROR(E_STDLIB);
+			res = E_STDLIB;
+			break;
+		}
+
+		memcpy(buffer, data, strlen(data));
+
+		/* write */
+		res = WriteFile(h_file, buffer, buffer_size, NULL, NULL);
+		if (!res) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		/* indicate write done */
+		if (!SetEvent(*(p_clnt->play_evt))) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		res = E_SUCCESS;
+
+	} while (0);
+	
+	/* cleanup */
+	if (buffer)
+		free(buffer);
+	if (h_file) {
+		if (!CloseHandle(h_file)) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+		}
+	}
+
+	return res;
+}
+
+
+int game_session_read(struct client *p_clnt, char *buffer)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+
+	HANDLE h_file = NULL;
+	int res;
+
+	do {
+		h_file = CreateFileA(PATH_GAME_SESSION,
+				     GENERIC_READ,
+				     0,
+				     NULL,
+				     OPEN_EXISTING,
+				     FILE_ATTRIBUTE_NORMAL,
+				     NULL);
+		if (!h_file) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		res = ReadFile(h_file, buffer, 23, NULL, NULL);
+		if (!res) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+			break;
+		}
+
+		res = E_SUCCESS;
+
+	} while (0);
+
+	if (h_file) {
+		if (!CloseHandle(h_file)) {
+			PRINT_ERROR(E_WINAPI);
+			res = E_WINAPI;
+		}
+	}
+
+	return res;
+
+}
+
+
+
+
+
+int session_sequece(struct client *p_clnt, char *buffer)
+{
+	struct game *p_game = &p_clnt->p_env->game;
+	int position = p_clnt->position;
+	int opponent_position = (position == MASTER) ? SLAVE : MASTER;
+	HANDLE *h_opponent_evt = p_game->h_play_evt[opponent_position];
+	int res;
+	DWORD wait_code;
+	char write[25] = {0};
+	memcpy(write, buffer, strlen(buffer));
+
+	/* acquire file lock */
+	res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+	if (res != E_SUCCESS)
+		return res;
+
+	/* check if opponent wrote data */
+	wait_code = WaitForSingleObject(h_opponent_evt, 0);
+	switch (wait_code) {
+	case WAIT_OBJECT_0:
+		/* read, then write */
+		res = game_session_read(p_clnt, buffer);
+		if (res != E_SUCCESS)
+			break;
+		res = game_session_write(p_clnt, write);
+		break;
+	case WAIT_TIMEOUT:
+		/* write, then wait */
+		res = game_session_write(p_clnt, write);
+		if (res != E_SUCCESS)
+			break;
+		/* relase lock (to allow opponent to write) */
+		res = game_session_release(&p_clnt->p_env->h_game_mtx);
+		if (res != E_SUCCESS)
+			break;
+		/* wait for opponents signal */
+		wait_code = WaitForSingleObject(h_opponent_evt, 7000);
+		switch (wait_code) {
+		case WAIT_TIMEOUT:
+			/* opponent didnt write */
+			res = E_TIMEOUT;
+			break;
+		case WAIT_OBJECT_0:
+			/* lock to read opponent data */
+			res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+			if (res != E_SUCCESS)
+				break;
+			/* read */
+			res = game_session_read(p_clnt, buffer);
+			if (res != E_SUCCESS)
+				break;
+			break;
+		case WAIT_FAILED:
+			PRINT_ERROR(E_WINAPI);
+		default:
+			res = E_WINAPI;
+		}
+		break;
+	
+	case WAIT_FAILED:
+		PRINT_ERROR(E_WINAPI);
+	default:
+		res = E_WINAPI;
+	}
+
+	if (res != E_TIMEOUT)
+		res |= game_session_release(&p_clnt->p_env->h_game_mtx);
 
 	return res;
 }
