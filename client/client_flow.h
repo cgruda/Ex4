@@ -31,8 +31,8 @@
 #define UI_GAME_START   "Game is on!\n"
 #define UI_GAME_CHOOSE  "Choose your 4 digits:\n"
 #define UI_GAME_GUESS   "Choose your guess:\n"
-#define UI_GAME_STAGE   "Bulls: %d\n" "Cows: %d\n" "%s played: %d\n"
-#define UI_GAME_WIN     "%s won!\n" "opponent number was %d\n"
+#define UI_GAME_STAGE   "Bulls: %s\n" "Cows: %s\n" "%s played: %s\n"
+#define UI_GAME_WIN     "%s won!\n" "opponent number was %s\n"
 #define UI_GAME_DRAW    "It's a tie\n"
 #define UI_GAME_STOP    "Opponent quit\n"
 #define UI_MENU_CONNECT "Choose what to do next:\n" "1. Try to reconnect\n" "2. Exit\n"
@@ -58,6 +58,7 @@ enum state_clnt
 	STATE_CLIENT_REQUEST,
 	STATE_ASK_FOR_GAME,
 	STATE_INVITE_AND_SETUP,
+	STATE_GAME_PLAY,
 	STATE_MAX
 };
 

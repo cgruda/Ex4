@@ -166,7 +166,17 @@ int flow_serv_ask_for_game(struct client *p_clnt)
 
 	/* enter a game */
 	res = game_session_start(p_clnt);
-	if (res != E_SUCCESS) {
+	switch (res) {
+	case E_SUCCESS:
+		break;
+	case E_TIMEOUT:
+		res = game_session_end(p_clnt);
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		return STATE_NO_OPPONENTS;
+	default:
 		p_clnt->last_err = res;
 		return STATE_ABORT_THREAD;
 	}
@@ -204,11 +214,12 @@ int flow_serv_ask_for_game(struct client *p_clnt)
 }
 
 
-int flow_serv_invite(struct client *p_clnt)
+int flow_serv_invite_and_setup(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
-	int res;
+	int res, next_state;
 	struct msg *p_msg = NULL;
+	char dummy[25] = {0};
 
 	/* send invite */
 	res = server_send_msg(p_clnt, MSG_SERVER_INVITE, p_clnt->opponent_username, NULL, NULL, NULL);
@@ -240,8 +251,21 @@ int flow_serv_invite(struct client *p_clnt)
 	memcpy(p_clnt->setup_numbers, p_msg->param_lst[0], 4); // FIXME:
 	DBG_TRACE_STR(T, p_clnt->username, "setup: %s", p_clnt->setup_numbers);
 
+	res = session_sequence(p_clnt, dummy); // TODO: does not work: we go to abort.
+	switch (res) {
+	case E_SUCCESS:
+		next_state = STATE_PLAYER_MOVE;
+		break;
+	case E_TIMEOUT:
+		next_state = STATE_OPONENT_QUIT;
+		break;
+	default:
+		p_clnt->last_err = E_FLOW; // FIXME:
+		next_state = STATE_ABORT_THREAD;
+	}
+
 	free_msg(&p_msg);
-	return STATE_ABORT_THREAD;
+	return next_state;
 }
 
 
@@ -346,6 +370,144 @@ int flow_serv_connect(struct client *p_clnt)
 	return state;
 }
 
+int flow_serv_opponent_quit(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	int res;
+	
+	res = server_send_msg(p_clnt, MSG_SERVER_OPPONENT_QUIT, NULL, NULL, NULL, NULL);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	res = game_session_end(p_clnt);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	return STATE_MAIN_MENU;
+}
+
+int flow_serv_player_move(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+	
+	int res;
+	struct msg *p_msg = NULL;
+	char buffer1[25] = {0};
+	char buffer2[25] = {0};
+	int bulls, cows;
+	bool i_won = false, op_won = false;
+
+	// ask player for guess
+	res = server_send_msg(p_clnt, MSG_SERVER_PLAYER_MOVE_REQUEST, NULL, NULL, NULL, NULL);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	res = server_recv_msg(p_clnt, &p_msg, MSG_TIMOUT_SEC_HUMAN_MAX);
+	if (res != E_SUCCESS) {
+		p_clnt->last_err = res;
+		return STATE_ABORT_THREAD;
+	}
+
+	memcpy(buffer1, p_msg->param_lst[0], strlen(p_msg->param_lst[0]));
+	free_msg(&p_msg);
+
+	// send my guess to op thread, i get opp guess (now kept in buff1)
+	res = session_sequence(p_clnt, buffer1);
+	switch (res) {
+	case E_SUCCESS:
+		break;
+	case E_TIMEOUT:
+		return STATE_OPONENT_QUIT;
+		break;
+	default:
+		p_clnt->last_err = E_FLOW; // FIXME:
+		return STATE_ABORT_THREAD;
+	}
+
+	// calc op bulls and cows of op compared to mine
+	DBG_TRACE_STR(T, p_clnt->username, "buffer1=%s, setup_num=%s", buffer1, p_clnt->setup_numbers);
+	bulls = game_bulls(buffer1, p_clnt->setup_numbers);
+	cows = game_cows(buffer1, p_clnt->setup_numbers);
+	if (bulls == 4) {
+		op_won = true;
+	}
+
+	// send op his bulls and cows, and get mine (now in buff2)
+	sprintf_s(buffer2, 4, "%d.%d", bulls, cows);
+	res = session_sequence(p_clnt, buffer2);
+	switch (res) {
+	case E_SUCCESS:
+		break;
+	case E_TIMEOUT:
+		return STATE_OPONENT_QUIT;
+		break;
+	default:
+		p_clnt->last_err = E_FLOW; // FIXME:
+		return STATE_ABORT_THREAD;
+	}
+
+	sscanf_s(buffer2, "%d.%d", &bulls, &cows);
+	if (bulls == 4)
+		i_won = true;
+	
+	buffer2[1] = 0;
+	if (i_won && op_won) {
+		res = server_send_msg(p_clnt, MSG_SERVER_DRAW, NULL, NULL, NULL, NULL);
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		res = game_session_end(p_clnt);
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		return STATE_MAIN_MENU;
+	} else if (!i_won && !op_won) {
+		res = server_send_msg(p_clnt, MSG_SERVER_GAME_RESULTS, &buffer2[0] , &buffer2[2], p_clnt->opponent_username, buffer1); // !!!!!!!!!!
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		res = game_session_end(p_clnt);
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		return STATE_MAIN_MENU;
+	} else {
+		memcpy(buffer1, p_clnt->setup_numbers, strlen(p_clnt->setup_numbers));
+		res = session_sequence(p_clnt, buffer1);
+		switch (res) {
+		case E_SUCCESS:
+			break;
+		case E_TIMEOUT:
+			return STATE_OPONENT_QUIT; // FIXME:
+		default:
+			p_clnt->last_err = E_FLOW; // FIXME:
+			return STATE_ABORT_THREAD;
+		}
+		char *winner_name = i_won ? p_clnt->username : p_clnt->opponent_username;
+		res = server_send_msg(p_clnt, MSG_SERVER_WIN, winner_name , buffer1, NULL, NULL);
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		res = game_session_end(p_clnt);
+		if (res != E_SUCCESS) {
+			p_clnt->last_err = res;
+			return STATE_ABORT_THREAD;
+		}
+		return STATE_MAIN_MENU;
+	}
+}
+
 
 // fsm functions
 int(*server_fsm[STATE_MAX])(struct client *p_clnt) =
@@ -358,6 +520,8 @@ int(*server_fsm[STATE_MAX])(struct client *p_clnt) =
 	[STATE_MAIN_MENU]       = flow_serv_main_menu,
 	[STATE_THREAD_CLEANUP]  = flow_serv_thread_cleanup,
 	[STATE_ASK_FOR_GAME]    = flow_serv_ask_for_game,
-	[STATE_GAME_INVITE]     = flow_serv_invite, // temp
+	[STATE_GAME_INVITE]     = flow_serv_invite_and_setup, // temp
 	[STATE_NO_OPPONENTS]    = flow_serv_no_opponents,
+	[STATE_OPONENT_QUIT]    = flow_serv_opponent_quit,
+	[STATE_PLAYER_MOVE]     = flow_serv_player_move,
 };

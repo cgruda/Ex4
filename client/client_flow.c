@@ -125,8 +125,7 @@ flow_clnt_reconnect_menu(struct client_env *p_env)
 	UI_GET(&choice);
 
 	/* parse choice */
-	switch (choice)
-	{
+	switch (choice) {
 	case CHOICE_RECONNECT:
 		return STATE_CONNECT_ATTEMPT;
 	case CHOICE_EXIT:
@@ -159,8 +158,7 @@ int flow_clnt_client_request(struct client_env *p_env)
 	}
 
 	/* interpet server response */
-	switch (p_msg->type)
-	{
+	switch (p_msg->type) {
 	case MSG_SERVER_APPROVED:
 		next_state = STATE_CONNECT_APPROVED;
 		break;
@@ -287,7 +285,7 @@ int flow_clnt_invite_and_setup(struct client_env *p_env)
 		return STATE_CONNECT_FAILURE;
 	}
 
-	return STATE_UNDEFINED_FLOW;
+	return STATE_GAME_PLAY;
 }
 
 
@@ -311,8 +309,7 @@ int flow_clnt_ask_for_game(struct client_env *p_env)
 		return STATE_CONNECT_FAILURE;
 	}
 
-	switch (p_msg->type)
-	{
+	switch (p_msg->type) {
 	case MSG_SERVER_NO_OPONENTS:
 		next_state = STATE_MAIN_MENU;
 		break;
@@ -341,6 +338,77 @@ int flow_clnt_undefined_flow(struct client_env *p_env)
 		return STATE_EXIT;
 }
 
+
+
+
+int flow_clnt_game_play(struct client_env *p_env)
+{
+	DBG_TRACE_FUNC(C, p_env->username);
+	struct msg *p_msg = NULL;
+	int res, next_state;
+	int number;
+	char buff[5] = {0};
+
+	res = client_recv_msg(&p_msg, p_env, MSG_TIMOUT_SEC_HUMAN_MAX);
+	if (res != E_SUCCESS) {
+		p_env->last_error = res;
+		return STATE_CONNECT_FAILURE;
+	}
+
+	switch (p_msg->type) {
+	case MSG_SERVER_PLAYER_MOVE_REQUEST:
+		UI_PRINT(UI_GAME_GUESS);
+		UI_GET(&number);
+
+		// TODO: check valid input
+		if (number > 9999 || number < 0) {
+			PRINT_ERROR(E_INPUT);
+			p_env->last_error = E_INPUT;
+			next_state = STATE_DISCONNECT;
+			break;
+		}
+
+		sprintf_s(buff, 5, "%d", number); // FIXME:
+
+		res = cilent_send_msg(p_env, MSG_CLIENT_PLAYER_MOVE, buff);
+		if (res != E_SUCCESS) {
+			p_env->last_error = res;
+			next_state = STATE_DISCONNECT;
+			break;
+		}
+
+		next_state = STATE_GAME_PLAY;
+		break;
+	case MSG_SERVER_GAME_RESULTS:
+		UI_PRINT(UI_GAME_STAGE, p_msg->param_lst[0], p_msg->param_lst[1],
+					p_msg->param_lst[2], p_msg->param_lst[3]);
+		next_state = STATE_GAME_PLAY;
+		break;
+	case MSG_SERVER_WIN:
+		UI_PRINT(UI_GAME_WIN, p_msg->param_lst[0], p_msg->param_lst[1]);
+		next_state = STATE_MAIN_MENU;
+		break;
+	case MSG_SERVER_DRAW:
+		UI_PRINT(UI_GAME_DRAW);
+		next_state = STATE_MAIN_MENU;
+		break;
+	case MSG_SERVER_OPPONENT_QUIT:
+		UI_PRINT(UI_GAME_STOP);
+		next_state = STATE_MAIN_MENU;
+		break;
+	default:
+		next_state = STATE_UNDEFINED_FLOW;
+		break;
+	}
+
+	free_msg(&p_msg);
+
+	return next_state;
+}
+
+
+
+
 // flow functions
 int(*clnt_flow[STATE_MAX])(struct client_env *p_env) =
 {
@@ -355,4 +423,5 @@ int(*clnt_flow[STATE_MAX])(struct client_env *p_env) =
 	[STATE_RECONNECT_MENU]   = flow_clnt_reconnect_menu,
 	[STATE_ASK_FOR_GAME]     = flow_clnt_ask_for_game,
 	[STATE_INVITE_AND_SETUP] = flow_clnt_invite_and_setup,
+	[STATE_GAME_PLAY]        = flow_clnt_game_play,
 };

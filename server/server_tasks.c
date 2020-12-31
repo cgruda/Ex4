@@ -149,7 +149,7 @@ int serv_comm_init(struct serv_env *p_env)
 	return E_SUCCESS;
 }
 
-serv_ctrl_init(struct serv_env *p_env)
+int serv_ctrl_init(struct serv_env *p_env)
 {
 	/* semaphore to restrict max players */
 	p_env->h_players_smpr = CreateSemaphore(NULL, MAX_PLAYERS, MAX_PLAYERS, NULL);
@@ -165,18 +165,42 @@ serv_ctrl_init(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
-	/* mutex to sync game session update */
-	p_env->h_game_mtx = CreateMutex(NULL, FALSE, NULL);
-	if (p_env->h_game_mtx == NULL) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
 	/* bitmap for thread creation control */
 	p_env->thread_bitmap = THREAD_BITMAP_INIT_MASK;
 
 	return E_SUCCESS;
 }
+
+// TODO: cleanup
+int serv_game_init(struct serv_env *p_env)
+{
+	struct game *p_game = &p_env->game;
+
+	p_game->h_play_evt[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (!p_game->h_play_evt[0]) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	p_game->h_play_evt[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (!p_game->h_play_evt[1]) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	/* mutex to sync game session update */
+	p_game->h_game_mtx = CreateMutex(NULL, FALSE, NULL);
+	if (p_game->h_game_mtx == NULL) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	p_game->players_cnt = 0; // FIXME:
+	p_game->accept_new_players = true;
+
+	return E_SUCCESS;
+}
+
 
 
 int server_init(struct serv_env *p_env)
@@ -196,6 +220,11 @@ int server_init(struct serv_env *p_env)
 
 	/* communication logic init */
 	res = serv_comm_init(p_env);
+	if (res != E_SUCCESS)
+		return res;
+
+	/* communication logic init */
+	res = serv_game_init(p_env);
 	if (res != E_SUCCESS)
 		return res;
 
@@ -428,8 +457,22 @@ int server_cleanup(struct serv_env *p_env)
 		}
 	}
 
-	if (p_env->h_game_mtx) {
-		if (!CloseHandle(p_env->h_game_mtx)) {
+	if (p_env->game.h_game_mtx) {
+		if (!CloseHandle(p_env->game.h_game_mtx)) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_WINAPI;
+		}
+	}
+
+	if (p_env->game.h_play_evt[0]) {
+		if (!CloseHandle(p_env->game.h_play_evt[0])) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_WINAPI;
+		}
+	}
+	
+	if (p_env->game.h_play_evt[1]) {
+		if (!CloseHandle(p_env->game.h_play_evt[1])) {
 			PRINT_ERROR(E_WINAPI);
 			ret_val = E_WINAPI;
 		}
@@ -509,11 +552,11 @@ enum player_position
 
 
 
-int game_session_lock(HANDLE *mtx)
+int game_lock(struct game *p_game)
 {
 	DWORD wait_code;
 
-	wait_code = WaitForSingleObject(*mtx, 5000);
+	wait_code = WaitForSingleObject(p_game->h_game_mtx, 5000);
 	switch (wait_code) {
 	case WAIT_FAILED:
 		PRINT_ERROR(E_WINAPI);
@@ -521,18 +564,18 @@ int game_session_lock(HANDLE *mtx)
 	case WAIT_OBJECT_0:
 		return E_SUCCESS;
 	case WAIT_TIMEOUT:
+		PRINT_ERROR(E_INTERNAL);
 		return E_TIMEOUT;
 	default:
 		return E_FAILURE;
 	}
 }
 
-
-int game_session_release(HANDLE *mtx)
+int game_release(struct game *p_game)
 {
 	int res;
 
-	res = ReleaseMutex(*mtx);
+	res = ReleaseMutex(p_game->h_game_mtx);
 	if (!res) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -546,167 +589,182 @@ int game_session_release(HANDLE *mtx)
 int destroy_game(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
-	int res = E_SUCCESS;
 	struct game *p_game = &p_clnt->p_env->game;
 
-	res = game_session_lock(&p_clnt->p_env->h_game_mtx);
-	if (res != E_SUCCESS)
-		return res;
-
-	if (!CloseHandle(p_game->h_play_evt[0])) {
+	if (!ResetEvent(*(p_clnt->play_evt))) {
 		PRINT_ERROR(E_WINAPI);
-		res = E_WINAPI;
-	}
-	
-	if (!CloseHandle(p_game->h_play_evt[1])) {
-		PRINT_ERROR(E_WINAPI);
-		res = E_WINAPI;
+		return E_WINAPI;
 	}
 
+	/* delete game session file */
 	if (!DeleteFileA(PATH_GAME_SESSION)) {
 		PRINT_ERROR(E_WINAPI);
-		res = E_WINAPI;
+		return E_WINAPI;
 	}
 
-	p_game->valid = false;
-	memset(p_game, 0, sizeof(*p_game));
+	/* update game */
+	p_game->players_cnt = 0;
+	p_game->accept_new_players = true;
+	
+	/* update client */
+	p_clnt->play_evt = NULL;
+	p_clnt->playing = false;
+	p_clnt->op_pos = 0; // FIXME:
 
-	res |= game_session_release(&p_clnt->p_env->h_game_mtx);
 
-	return res;
+	return E_SUCCESS;
 }
-
 
 int leave_game(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
 
-	int position = p_clnt->position;
 	struct game *p_game = &p_clnt->p_env->game;
 
-	p_clnt->play_evt = NULL;
-	p_clnt->playing = false;
-
-	return E_SUCCESS;
-}
-
-
-int game_session_end(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-
-	int res = E_SUCCESS;
-
-	struct game *p_game = &p_clnt->p_env->game;
-	int position = p_clnt->position;
-
-	if (position == MASTER) {
-		leave_game(p_clnt);
-		res = destroy_game(p_clnt);
-	} else {
-		leave_game(p_clnt);
+	if (!ResetEvent(*(p_clnt->play_evt))) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
 	}
 
-	return res;
+	/* update client */
+	p_clnt->play_evt = NULL;
+	p_clnt->playing = false;
+	p_clnt->op_pos = 0; // FIXME:
+
+	/* update game */
+	p_game->players_cnt--;
+
+	return E_SUCCESS;
 }
 
 
-
-
-
-int join_game(struct client *p_clnt, int position)
+int join_game(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
 
 	struct game *p_game = &p_clnt->p_env->game;
 
-	p_clnt->position = position;
-	p_clnt->play_evt = &p_game->h_play_evt[position];
+	/* update client */
+	p_clnt->op_pos = 0;
+	p_clnt->play_evt = &p_game->h_play_evt[1];
 	p_clnt->playing = true;
+
+	/* update game */
+	p_game->players_cnt++;
+	p_game->accept_new_players = false;
+
+	if (!SetEvent(*(p_clnt->play_evt))) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
 
 	return E_SUCCESS;
 }
-
 
 int create_game(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
 	struct game *p_game = &p_clnt->p_env->game;
 	HANDLE h_file = NULL;
-	int res;
 
-	do {
-		p_game->h_play_evt[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
-		if (!p_game->h_play_evt[0]) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		p_game->h_play_evt[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
-		if (!p_game->h_play_evt[1]) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		/* create session file */
-		h_file = CreateFileA(PATH_GAME_SESSION,     /* GameSession path    */
-				     0,                     /* no access needed    */
-				     0,                     /* no share            */
-				     NULL,                  /* default security    */
-				     CREATE_ALWAYS,         /* create file         */
-				     FILE_ATTRIBUTE_NORMAL, /* asynchronous read   */
-				     NULL);                 /* no template         */
-		if (!h_file) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-	
-		if (!CloseHandle(h_file)) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		res = E_SUCCESS;
-
-	} while (0);
-
-	if (res != E_SUCCESS) { // FIXME:
-		CloseHandle(p_game->h_play_evt[0]);
-		CloseHandle(p_game->h_play_evt[1]);
-		CloseHandle(h_file);
-		return res;
+	/* create session file */
+	h_file = CreateFileA(PATH_GAME_SESSION,     /* GameSession path    */
+			     0,                     /* no access needed    */
+			     0,                     /* no share            */
+			     NULL,                  /* default security    */
+			     CREATE_ALWAYS,         /* create file         */
+			     FILE_ATTRIBUTE_NORMAL, /* asynchronous read   */
+			     NULL);                 /* no template         */
+	if (!h_file) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
 	}
 
-	p_game->valid = true;
+	/* close handle to session file */
+	if (!CloseHandle(h_file)) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	/* update game */
+	p_game->players_cnt++;
+
+	/* update client */
+	p_clnt->op_pos = 1;
+	p_clnt->play_evt = &p_game->h_play_evt[0];
+	p_clnt->playing = true;
+
+	if (!SetEvent(*(p_clnt->play_evt))) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
 	return E_SUCCESS;
 }
+
+
 
 int game_session_start(struct client *p_clnt)
 {
 	DBG_TRACE_FUNC(T, p_clnt->username);
-	int res = E_SUCCESS;
+	struct game *p_game = &p_clnt->p_env->game;
+	DWORD wait_code;
+	int res;
 
 	/* aquaire game mutex */
-	res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+	res = game_lock(p_game);
 	if (res != E_SUCCESS)
 		return res;
 
-	if (!p_clnt->p_env->game.valid) {
-		res = create_game(p_clnt);
-		if (res == E_SUCCESS)
-			join_game(p_clnt, MASTER);
+	if (p_game->accept_new_players) {
+		if (p_game->players_cnt == 0)
+			res = create_game(p_clnt);
+		else
+			res = join_game(p_clnt);
 	} else {
-		join_game(p_clnt, SLAVE);
+		res = E_FAILURE;
 	}
 
-	res |= game_session_release(&p_clnt->p_env->h_game_mtx);
+	res |= game_release(p_game);
+	if (res != E_SUCCESS)
+		return res;
+
+	wait_code = WaitForSingleObject(p_game->h_play_evt[p_clnt->op_pos], 27000); // FIXME:
+	switch (wait_code) {
+	case WAIT_TIMEOUT:
+		return E_TIMEOUT;
+	case WAIT_OBJECT_0:
+		return E_SUCCESS;
+	case WAIT_FAILED:
+		PRINT_ERROR(E_WINAPI);
+		/* fall through */
+	default:
+		res = E_WINAPI;
+	}
 
 	return res;
 }
+
+int game_session_end(struct client *p_clnt)
+{
+	DBG_TRACE_FUNC(T, p_clnt->username);
+
+	int res;
+	struct game *p_game = &p_clnt->p_env->game;
+
+	res = game_lock(p_game);
+
+	if (p_game->players_cnt == 2)
+		res = leave_game(p_clnt);
+	else
+		res = destroy_game(p_clnt);
+
+	res |= game_release(p_game);
+
+	return res;
+}
+
+#define GAME_VALID(p_game) (p_game->players_cnt == MAX_PLAYERS)
 
 
 int game_session_write(struct client *p_clnt, char *data)
@@ -822,22 +880,17 @@ int game_session_read(struct client *p_clnt, char *buffer)
 }
 
 
-
-
-
 int session_sequence(struct client *p_clnt, char *buffer)
 {
 	struct game *p_game = &p_clnt->p_env->game;
-	int position = p_clnt->position;
-	int opponent_position = (position == MASTER) ? SLAVE : MASTER;
-	HANDLE *h_opponent_evt = p_game->h_play_evt[opponent_position];
+	HANDLE *h_opponent_evt = p_game->h_play_evt[p_clnt->op_pos];
 	int res;
 	DWORD wait_code;
 	char write[25] = {0};
 	memcpy(write, buffer, strlen(buffer));
 
 	/* acquire file lock */
-	res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+	res = game_lock(p_game);
 	if (res != E_SUCCESS)
 		return res;
 
@@ -857,11 +910,11 @@ int session_sequence(struct client *p_clnt, char *buffer)
 		if (res != E_SUCCESS)
 			break;
 		/* relase lock (to allow opponent to write) */
-		res = game_session_release(&p_clnt->p_env->h_game_mtx);
+		res = game_release(p_game);
 		if (res != E_SUCCESS)
 			break;
 		/* wait for opponents signal */
-		wait_code = WaitForSingleObject(h_opponent_evt, 7000);
+		wait_code = WaitForSingleObject(h_opponent_evt, 25000);
 		switch (wait_code) {
 		case WAIT_TIMEOUT:
 			/* opponent didnt write */
@@ -869,7 +922,7 @@ int session_sequence(struct client *p_clnt, char *buffer)
 			break;
 		case WAIT_OBJECT_0:
 			/* lock to read opponent data */
-			res = game_session_lock(&p_clnt->p_env->h_game_mtx);
+			res = game_lock(p_game);
 			if (res != E_SUCCESS)
 				break;
 			/* read */
@@ -883,7 +936,6 @@ int session_sequence(struct client *p_clnt, char *buffer)
 			res = E_WINAPI;
 		}
 		break;
-	
 	case WAIT_FAILED:
 		PRINT_ERROR(E_WINAPI);
 	default:
@@ -891,7 +943,38 @@ int session_sequence(struct client *p_clnt, char *buffer)
 	}
 
 	if (res != E_TIMEOUT)
-		res |= game_session_release(&p_clnt->p_env->h_game_mtx);
+		res |= game_release(p_game);
 
 	return res;
+}
+
+
+int game_bulls(char *a, char *b)
+{
+	int bulls = 0;
+
+	for (int i = 0; i < 4; i++)
+		if (a[i] == b[i])
+			bulls++;
+
+	return bulls;
+}
+
+
+int game_cows(char *a, char *b)
+{
+	int cows = 0;
+
+	for (int i = 0; i < 4; i++) {
+		for (int j = 0; j < 4; j++) {
+			if (i == j)
+				continue;
+			if (a[i] == b[j]) {
+				cows++;
+				break;
+			}
+		}
+	}
+
+	return cows;
 }

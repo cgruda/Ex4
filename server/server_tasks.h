@@ -58,8 +58,10 @@
 
 struct game
 {
-	bool valid;
+	int players_cnt;
+	bool accept_new_players;
 	HANDLE h_play_evt[2];
+	HANDLE h_game_mtx;
 };
 
 struct client
@@ -70,12 +72,11 @@ struct client
 	struct serv_env *p_env;
 	char *username;
 	char setup_numbers[5]; // FIXME:
-	char opponent_numbers[5]; // FIXME:
 	char *opponent_username;
 	bool connected;
 	bool playing;
 	HANDLE *play_evt;
-	int position;
+	int op_pos;
 };
 
 struct serv_env
@@ -90,8 +91,6 @@ struct serv_env
 	// control params
 	HANDLE h_players_smpr;
 	HANDLE h_abort_evt;
-	HANDLE h_game_file;
-	HANDLE h_game_mtx;
 	HANDLE h_file_stdin;
 	OVERLAPPED olp_stdin;
 	char buffer[7]; // FIXME:
@@ -228,6 +227,7 @@ int server_check_thread_status(struct serv_env *p_env, int ms);
 int game_session_start(struct client *p_clnt);
 int session_sequence(struct client *p_clnt, char *buffer);
 int game_session_end(struct client *p_clnt);
-
+int game_bulls(char *a, char *b);
+int game_cows(char *a, char *b);
 
 #endif // __SERVER_TASKS_H__
