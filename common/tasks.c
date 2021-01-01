@@ -1,18 +1,11 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client program
+ * common
  *
- * message.c
+ * tasks.c
  * 
- * this module handles the messages that are the base
- * of the communication protocol used by the server
- * and client for playing a game.
- * 
- * messages MUST be created only by using new_msg()
- * and freed only by using free_msg(). static messages
- * are un-supporetd by this module, and may result with
- * un-expected behaviour of the program.
+ * TODO:
  * 
  * by: Chaim Gruda
  *     Nir Beiber
@@ -24,8 +17,7 @@
  ==============================================================================
  */
 
-#pragma comment(lib, "ws2_32.lib")
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS // FIXME:
 
 /*
  ==============================================================================
@@ -46,6 +38,13 @@
  ==============================================================================
  */
 
+#if DBG_TRACE
+char *dbg_trace_mode_2_str[TRACE_MAX] = { // FIXME:
+	[TRACE_CLIENT] = "client_",
+	[TRACE_THREAD] = "thread_",
+	[TRACE_SERVER] = "",
+};
+#endif
 
 /*
  ==============================================================================
@@ -108,14 +107,7 @@ int my_atoi(char *str, int *p_result)
 	return E_SUCCESS;
 }
 
-#if DBG_TRACE
-
-char *dbg_trace_mode_2_str[TRACE_MAX] = {
-	[TRACE_CLIENT] = "client_",
-	[TRACE_THREAD] = "thread_",
-	[TRACE_SERVER] = "",
-};
-
+#if DBG_TRACE // FIXME:
 char *dbg_trace_get_path(int mode, char *name)
 {
 	char *path = calloc(100, sizeof(char));
@@ -163,4 +155,4 @@ void dbg_trace_log(int mode, char *name, char *str)
 	free(path);
 }
 
-#endif
+#endif // DBG_TRACE

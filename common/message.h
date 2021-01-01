@@ -22,21 +22,18 @@
  ==============================================================================
  */
 
-#define MSG_TIMEOUT_INFINITE         -1
 #define MSG_TIMEOUT_SEC_DEFAULT      15
 #define MSG_TIMEOUT_SEC_MAX          30
 #define MSG_TIMOUT_SEC_HUMAN_MAX     900 // 15 mins
 #define MSG_MAX_PARAMS               4
-#define MSG_TIME_INCERMENT_SEC       0  // 0 sec
-#define MSG_TIME_INCERMENT_USEC      (250 * MS2US)  // 250 msec
+#define MSG_TIME_INCERMENT_USEC      (250 * MS2US)
 /*
  ==============================================================================
  * ENUMERATIONS
  ==============================================================================
  */
 
-enum msg_type
-{
+enum msg_type {
 	MSG_INVALID,
 	MSG_MIN,
 	MSG_CLIENT_REQUEST = MSG_MIN,
@@ -64,8 +61,7 @@ enum msg_type
  ==============================================================================
  */
 
-struct msg
-{
+struct msg {
 	int type;
 	int param_cnt;
 	char *param_lst[MSG_MAX_PARAMS];
@@ -76,14 +72,6 @@ struct msg
  * FUNCTIONS DECLARATION
  ==============================================================================
  */
-
-/**
- ******************************************************************************
- * @brief print messgae in human readable format to stdout
- * @param p_msg pointer to message
- ******************************************************************************
- */
-void print_msg(struct msg *p_msg);
 
 /**
  ******************************************************************************
@@ -131,9 +119,15 @@ int send_msg(int skt, struct msg **p_p_msg);
  */
 int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout);
 
-
+/**
+ ******************************************************************************
+ * @brief convert messgae struct to human readable string
+ * @param p_msg pointer to message
+ * @return pointer to string holding messha in human readable foramt
+ ******************************************************************************
+ */
 #if DBG_TRACE
-char *dbg_trace_msg(struct msg *p_msg);
+char *dbg_trace_msg_2_str(struct msg *p_msg); // FIXME:
 #endif
 
 

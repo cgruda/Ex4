@@ -9,7 +9,7 @@
  *     Nir Beiber
  */
 
-#define _CRT_SECURE_NO_WARNINGS		// FIXME:
+#define _CRT_SECURE_NO_WARNINGS
 
 /*
  ==============================================================================
@@ -32,12 +32,14 @@
 
 int game_init(struct game *p_game)
 {
+	/* event thread 0 uses to notify thread 1 */
 	p_game->h_play_evt[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
 	if (!p_game->h_play_evt[0]) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
 
+	/* event thread1 uses to notify thread 0 */
 	p_game->h_play_evt[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
 	if (!p_game->h_play_evt[1]) {
 		PRINT_ERROR(E_WINAPI);
@@ -125,8 +127,10 @@ int game_release(struct game *p_game)
 int destroy_game(struct client *p_client)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+
 	struct game *p_game = &p_client->p_env->game;
 
+	/* make sure my event is down */
 	if (!ResetEvent(*(p_client->p_h_play_evt))) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -145,7 +149,7 @@ int destroy_game(struct client *p_client)
 	/* update client */
 	p_client->p_h_play_evt = NULL;
 	p_client->playing = false;
-	p_client->opp_pos = 0; // FIXME:
+	p_client->opp_pos = 0;
 
 	return E_SUCCESS;
 }
@@ -156,6 +160,7 @@ int leave_game(struct client *p_client)
 
 	struct game *p_game = &p_client->p_env->game;
 
+	/* make sure my event is down */
 	if (!ResetEvent(*(p_client->p_h_play_evt))) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -164,7 +169,7 @@ int leave_game(struct client *p_client)
 	/* update client */
 	p_client->p_h_play_evt = NULL;
 	p_client->playing = false;
-	p_client->opp_pos = 0; // FIXME:
+	p_client->opp_pos = 0;
 
 	/* update game */
 	p_game->players_cnt--;
@@ -193,6 +198,7 @@ int join_game(struct client *p_client)
 int create_game(struct client *p_client)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+
 	struct game *p_game = &p_client->p_env->game;
 	HANDLE h_file = NULL;
 
@@ -229,15 +235,16 @@ int create_game(struct client *p_client)
 int game_session_start(struct client *p_client)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+
 	struct game *p_game = &p_client->p_env->game;
-	// DWORD wait_code;
 	int res;
 
-	/* aquaire game mutex */
+	/* aquaire game lock */
 	res = game_lock(p_game);
 	if (res != E_SUCCESS)
 		return res;
 
+	/* create or join game */
 	if (p_game->accept_new_players) {
 		if (p_game->players_cnt == 0)
 			res = create_game(p_client);
@@ -247,6 +254,7 @@ int game_session_start(struct client *p_client)
 		res = E_FAILURE;
 	}
 
+	/* release game lock */
 	res |= game_release(p_game);
 	if (res != E_SUCCESS)
 		return res;
@@ -258,13 +266,17 @@ int game_session_end(struct client *p_client)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
-	if (!p_client->playing)
-		return E_SUCCESS;
-
 	int res;
 	struct game *p_game = &p_client->p_env->game;
 
+	/* make sure player is in game */
+	if (!p_client->playing)
+		return E_SUCCESS;
+
+	/* lock game */
 	res = game_lock(p_game);
+	if (res != E_SUCCESS)
+		return res;
 
 	/* leave or destroy game */
 	switch (p_game->players_cnt) {
@@ -278,6 +290,7 @@ int game_session_end(struct client *p_client)
 		break;
 	}
 
+	/* release game */
 	res |= game_release(p_game);
 
 	return res;
@@ -289,10 +302,10 @@ int game_session_write(struct client *p_client, char *data)
 
 	HANDLE h_file = NULL;
 	int res;
-	int buffer_size;
-	char *buffer = NULL;
 
+	/* do-while(0) for easy cleanup */
 	do {
+		/* create file for write */
 		h_file = CreateFileA(PATH_GAME_SESSION,
 				     GENERIC_WRITE,
 				     FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -306,18 +319,8 @@ int game_session_write(struct client *p_client, char *data)
 			break;
 		}
 
-		buffer_size = strlen(data) + 1;
-		buffer = calloc(buffer_size, 1);
-		if (!buffer) {
-			PRINT_ERROR(E_STDLIB);
-			res = E_STDLIB;
-			break;
-		}
-
-		memcpy(buffer, data, strlen(data));
-
-		/* write */
-		res = WriteFile(h_file, buffer, buffer_size, NULL, NULL);
+		/* write data */
+		res = WriteFile(h_file, data, strlen(data) + 1, NULL, NULL);
 		if (!res) {
 			PRINT_ERROR(E_WINAPI);
 			res = E_WINAPI;
@@ -328,7 +331,6 @@ int game_session_write(struct client *p_client, char *data)
 		if (!SetEvent(*(p_client->p_h_play_evt))) {
 			PRINT_ERROR(E_WINAPI);
 			res = E_WINAPI;
-			break;
 		}
 
 		res = E_SUCCESS;
@@ -336,8 +338,6 @@ int game_session_write(struct client *p_client, char *data)
 	} while (0);
 	
 	/* cleanup */
-	if (buffer)
-		free(buffer);
 	if (h_file) {
 		if (!CloseHandle(h_file)) {
 			PRINT_ERROR(E_WINAPI);
@@ -358,7 +358,9 @@ int game_session_read(struct client *p_client, char *buffer)
 	int res;
 	buffer[0] = 0;
 
+	/* dp-while(0) for easy cleanup */
 	do {
+		/* open file */
 		h_file = CreateFileA(PATH_GAME_SESSION,
 				     GENERIC_READ,
 				     FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -372,6 +374,7 @@ int game_session_read(struct client *p_client, char *buffer)
 			break;
 		}
 
+		/* read data */
 		res = ReadFile(h_file, buffer, 23, NULL, NULL);
 		if (!res) {
 			PRINT_ERROR(E_WINAPI);
@@ -383,6 +386,7 @@ int game_session_read(struct client *p_client, char *buffer)
 
 	} while (0);
 
+	/* close file */
 	if (h_file) {
 		if (!CloseHandle(h_file)) {
 			PRINT_ERROR(E_WINAPI);

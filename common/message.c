@@ -24,8 +24,8 @@
  ==============================================================================
  */
 
-#pragma comment(lib, "ws2_32.lib")
 #define _CRT_SECURE_NO_WARNINGS
+#pragma comment(lib, "ws2_32.lib")
 
 /*
  ==============================================================================
@@ -45,8 +45,7 @@
  ==============================================================================
  */
 
-char *msg_type_2_str[MSG_MAX] =
-{
+char *msg_type_2_str[MSG_MAX] = {
 	[MSG_CLIENT_REQUEST]             = "CLIENT_REQUEST",
 	[MSG_CLIENT_VERSUS]              = "CLIENT_VERSUS",
 	[MSG_CLIENT_SETUP]               = "CLIENT_SETUP",
@@ -140,7 +139,7 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 
 	/* allocate mem */
 	p_msg = calloc(1, sizeof(*p_msg));
-	if (p_msg == NULL)
+	if (!p_msg)
 		return E_STDLIB;
 
 	/* parse message type */
@@ -187,8 +186,8 @@ struct msg *new_msg(int type, char *p0, char *p1, char *p2, char *p3)
 
 	/* allocate message */
 	p_msg = calloc(1, sizeof(*p_msg));
-	if (p_msg == NULL) {
-		PRINT_ERROR(E_STDLIB); // FIXME:
+	if (!p_msg) {
+		PRINT_ERROR(E_STDLIB);
 		return NULL;
 	}
 
@@ -230,45 +229,6 @@ void free_msg(struct msg **p_p_msg)
 	*p_p_msg = NULL;
 }
 
-void print_msg(struct msg *p_msg)
-{
-	if (!p_msg) {
-		printf("\n\t\tNULL\n");
-	} else {
-		printf("\n\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
-		for (int i = 0; i < p_msg->param_cnt; i++)
-			printf("\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
-	}
-	printf("\n");
-}
-
-#if DBG_TRACE
-char *dbg_trace_msg(struct msg *p_msg)
-{
-	char *p, *str = calloc(100, sizeof(char));
-	if (!str) {
-		PRINT_ERROR(E_INTERNAL);
-		exit(E_FAILURE);
-	}
-	p = str;
-
-	if (!p_msg) {
-		sprintf(p, "\n\t\tNULL\n");
-		p += strlen(p);
-	} else {
-		sprintf(p, "\n\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
-		p += strlen(p);
-		for (int i = 0; i < p_msg->param_cnt; i++) {
-			sprintf(p, "\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
-			p += strlen(p);
-		}
-	}
-	sprintf(p, "\n");
-	return str;
-}
-#endif
-
-
 int send_msg(int skt, struct msg **p_p_msg)
 {
 	char *buffer = NULL;
@@ -285,7 +245,7 @@ int send_msg(int skt, struct msg **p_p_msg)
 	do {
 		/* allocate send buffer */
 		buff_len = msg_buff_len(p_msg);
-		buffer = calloc(buff_len + 1, sizeof(*buffer)); // FIXME: +1 is temporary for debug only
+		buffer = calloc(buff_len + 1, sizeof(*buffer));
 		if (buffer == NULL) {
 			ret_val = E_STDLIB;
 			break;
@@ -295,7 +255,7 @@ int send_msg(int skt, struct msg **p_p_msg)
 		msg_2_buff(buffer, p_msg);
 
 		/* send message */
-		res = send(skt, buffer, buff_len + 1, 0); // FIXME: +1 needed for case of multiple messages
+		res = send(skt, buffer, buff_len + 1, 0);
 		if (res == SOCKET_ERROR) { // FIXME: partial send
 			ret_val = E_WINSOCK;
 			break;
@@ -352,3 +312,29 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 
 	return res;
 }
+
+#if DBG_TRACE
+char *dbg_trace_msg_2_str(struct msg *p_msg)
+{
+	char *p, *str = calloc(100, sizeof(char)); // FIXME:
+	if (!str) {
+		PRINT_ERROR(E_INTERNAL);
+		exit(E_FAILURE);
+	}
+	p = str;
+
+	if (!p_msg) {
+		sprintf(p, "\n\t\tNULL\n");
+		p += strlen(p);
+	} else {
+		sprintf(p, "\n\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
+		p += strlen(p);
+		for (int i = 0; i < p_msg->param_cnt; i++) {
+			sprintf(p, "\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
+			p += strlen(p);
+		}
+	}
+	sprintf(p, "\n");
+	return str;
+}
+#endif

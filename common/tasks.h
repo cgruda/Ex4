@@ -28,16 +28,18 @@
  * DEFINES
  ==============================================================================
  */
+
 // debug prints enable
 #define DBG_ENABLE     1
 #define DBG_TRACE      1
 #define SERVER         "server"
 
-// times
+// time conversion
 #define MS2US                1000
 #define SEC2MS               1000
 #define MIN2SEC              60
 
+// max port number
 #define MAX_PORT             65536
 
 /*
@@ -146,9 +148,9 @@ enum trace_mode {
 	} while (0)
 
 #define DBG_TRACE_MSG(mode, name, p_msg) do {							\
-		char *dbg_trace_msg_str = dbg_trace_msg(p_msg);					\
-		DBG_TRACE_LOG(mode, name, dbg_trace_msg_str);					\
-		free(dbg_trace_msg_str);							\
+		char *dbg_trace_msg_2_str_str = dbg_trace_msg_2_str(p_msg);			\
+		DBG_TRACE_LOG(mode, name, dbg_trace_msg_2_str_str);				\
+		free(dbg_trace_msg_2_str_str);							\
 	} while (0)
 
 char *dbg_trace_get_path(int mode, char *name);

@@ -51,7 +51,7 @@ struct game {
 
 /**
  ******************************************************************************
- * @brief initialize game object
+ * @brief initialize game struct
  * @param p_game pointer to game struct
  * @return err_val enum
  ******************************************************************************
@@ -69,45 +69,55 @@ int game_cleanup(struct game *p_game);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param p_client pointer to client object
- * @return err_val enum
+ * @brief start game session:
+ *        first thread to call function creates the game
+ *        second thread to call function joins the game
+ * @param p_client pointer to client struct
+ * @return E_SUCCESS on success
  ******************************************************************************
  */
 int game_session_start(struct client *p_client);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param p_client pointer to client object
- * @return err_val enum
- ******************************************************************************
- */
-int game_sequence(struct client *p_client, char *write_buff, char *read_buff);
-
-/**
- ******************************************************************************
- * @brief TODO:
- * @param p_client pointer to client object
- * @return err_val enum
+ * @brief end a game session:
+ *        first thread to call this function leaves the game
+ *        second thread to call this function destroys the game
+ * @param p_client pointer to client struct
+ * @return E_SUCCESS on success
  ******************************************************************************
  */
 int game_session_end(struct client *p_client);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param p_client pointer to client object
- * @return err_val enum
+ * @brief sync threads, and allow passing data between them
+ * @param p_client pointer to client struct
+ * @param write_buff data to be written in GameSession file
+ * @param read_buff data that has been read from GameSession file
+ * @return E_SUCCESS on success
+ *         E_TIMEOUT if sync with secind thread is lost
+ *         other err_vals on error
+ ******************************************************************************
+ */
+int game_sequence(struct client *p_client, char *write_buff, char *read_buff);
+
+/**
+ ******************************************************************************
+ * @brief count bulls by comparing 2 strings
+ * @param a string
+ * @param b string
+ * @return number of bulls
  ******************************************************************************
  */
 int game_bulls(char *a, char *b);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param p_client pointer to client object
- * @return err_val enum
+ * @brief count cows by comparing 2 strings
+ * @param a string
+ * @param b string
+ * @return number of cows
  ******************************************************************************
  */
 int game_cows(char *a, char *b);
