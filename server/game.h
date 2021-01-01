@@ -70,34 +70,34 @@ int game_cleanup(struct game *p_game);
 /**
  ******************************************************************************
  * @brief TODO:
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @return err_val enum
  ******************************************************************************
  */
-int game_session_start(struct client *p_clnt);
+int game_session_start(struct client *p_client);
 
 /**
  ******************************************************************************
  * @brief TODO:
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @return err_val enum
  ******************************************************************************
  */
-int game_sequence(struct client *p_clnt, char *write_buff, char *read_buff);
+int game_sequence(struct client *p_client, char *write_buff, char *read_buff);
 
 /**
  ******************************************************************************
  * @brief TODO:
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @return err_val enum
  ******************************************************************************
  */
-int game_session_end(struct client *p_clnt);
+int game_session_end(struct client *p_client);
 
 /**
  ******************************************************************************
  * @brief TODO:
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @return err_val enum
  ******************************************************************************
  */
@@ -106,7 +106,7 @@ int game_bulls(char *a, char *b);
 /**
  ******************************************************************************
  * @brief TODO:
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @return err_val enum
  ******************************************************************************
  */

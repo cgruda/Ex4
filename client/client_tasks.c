@@ -44,7 +44,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 	int port;
 
 	/* check number of arguments */
-	if (argc != ARGC) {
+	if (argc != CLIENT_ARGC) {
 		print_usage();
 		return E_FAILURE;
 	}
@@ -54,7 +54,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 		printf("\n%s is not a valid ip addres", argv[1]);
 		ret_val = E_FAILURE;
 	}
-	p_env->serv_ip = argv[1];
+	p_env->server_ip = argv[1];
 
 	/* check port number */
 	port = strtol(argv[2], NULL, 10);
@@ -62,7 +62,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 		printf("\n%s is not a valid port", argv[2]);
 		ret_val = E_FAILURE;
 	}
-	p_env->serv_port = port;
+	p_env->server_port = port;
 
 	/* check user name*/
 	res = strlen(argv[3]) <= MAX_USERNAME_LEN;
@@ -84,7 +84,7 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 
 int client_init(struct client_env *p_env)
 {
-	DBG_TRACE_INIT(C, p_env->username);
+	DBG_TRACE_INIT(TRACE_CLIENT, p_env->username);
 	WSADATA	wsa_data;
 	int res;
 
@@ -99,15 +99,15 @@ int client_init(struct client_env *p_env)
 	/* set server address */
 	p_env->skt                    = INVALID_SOCKET;
 	p_env->server.sin_family      = AF_INET;
-	p_env->server.sin_addr.s_addr = inet_addr(p_env->serv_ip);
-	p_env->server.sin_port        = htons(p_env->serv_port);
+	p_env->server.sin_addr.s_addr = inet_addr(p_env->server_ip);
+	p_env->server.sin_port        = htons(p_env->server_port);
 
 	return STATE_CONNECT_ATTEMPT;
 }
 
 int cilent_send_msg(struct client_env *p_env, int type, char *param)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res;
 
@@ -119,7 +119,7 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 	/* send message */
 	res = send_msg(p_env->skt, &p_msg);
 
-	DBG_TRACE_MSG(C, p_env->username, p_msg);
+	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, p_msg);
 
 	/* free message */
 	free_msg(&p_msg);
@@ -129,7 +129,7 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 
 int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int res;
 	TIMEVAL tv = {0};
 
@@ -137,12 +137,12 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 	res = recv_msg(p_p_msg, p_env->skt, &tv);
 
 	// if ((*p_p_msg)->type == MSG_SERVER_GAME_RESULTS)
-	// 	DBG_TRACE_STR(C, p_env->username, "param_cnt=%d", (*p_p_msg)->param_cnt); // FIXME:
+	// 	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "param_cnt=%d", (*p_p_msg)->param_cnt); // FIXME:
 
-	DBG_TRACE_MSG(C, p_env->username, *p_p_msg);
+	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, *p_p_msg);
 
 	// if ((*p_p_msg)->type == MSG_SERVER_GAME_RESULTS)
-	// 	DBG_TRACE_STR(C, p_env->username, "dbg2"); // FIXME:
+	// 	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "dbg2"); // FIXME:
 
 
 	return res;
@@ -151,7 +151,7 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 
 int client_cleanup(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int ret_val = p_env->last_error;
 
 	if (WSACleanup()) {

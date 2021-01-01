@@ -122,12 +122,12 @@ int game_release(struct game *p_game)
 	return E_SUCCESS;
 }
 
-int destroy_game(struct client *p_clnt)
+int destroy_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+	struct game *p_game = &p_client->p_env->game;
 
-	if (!ResetEvent(*(p_clnt->play_evt))) {
+	if (!ResetEvent(*(p_client->p_h_play_evt))) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
@@ -143,28 +143,28 @@ int destroy_game(struct client *p_clnt)
 	p_game->accept_new_players = true;
 	
 	/* update client */
-	p_clnt->play_evt = NULL;
-	p_clnt->playing = false;
-	p_clnt->op_pos = 0; // FIXME:
+	p_client->p_h_play_evt = NULL;
+	p_client->playing = false;
+	p_client->opp_pos = 0; // FIXME:
 
 	return E_SUCCESS;
 }
 
-int leave_game(struct client *p_clnt)
+int leave_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
-	struct game *p_game = &p_clnt->p_env->game;
+	struct game *p_game = &p_client->p_env->game;
 
-	if (!ResetEvent(*(p_clnt->play_evt))) {
+	if (!ResetEvent(*(p_client->p_h_play_evt))) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
 
 	/* update client */
-	p_clnt->play_evt = NULL;
-	p_clnt->playing = false;
-	p_clnt->op_pos = 0; // FIXME:
+	p_client->p_h_play_evt = NULL;
+	p_client->playing = false;
+	p_client->opp_pos = 0; // FIXME:
 
 	/* update game */
 	p_game->players_cnt--;
@@ -172,16 +172,16 @@ int leave_game(struct client *p_clnt)
 	return E_SUCCESS;
 }
 
-int join_game(struct client *p_clnt)
+int join_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
-	struct game *p_game = &p_clnt->p_env->game;
+	struct game *p_game = &p_client->p_env->game;
 
 	/* update client */
-	p_clnt->op_pos = 0;
-	p_clnt->play_evt = &p_game->h_play_evt[1];
-	p_clnt->playing = true;
+	p_client->opp_pos = 0;
+	p_client->p_h_play_evt = &p_game->h_play_evt[1];
+	p_client->playing = true;
 
 	/* update game */
 	p_game->players_cnt++;
@@ -190,10 +190,10 @@ int join_game(struct client *p_clnt)
 	return E_SUCCESS;
 }
 
-int create_game(struct client *p_clnt)
+int create_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+	struct game *p_game = &p_client->p_env->game;
 	HANDLE h_file = NULL;
 
 	/* create session file */
@@ -219,17 +219,17 @@ int create_game(struct client *p_clnt)
 	p_game->players_cnt++;
 
 	/* update client */
-	p_clnt->op_pos = 1;
-	p_clnt->play_evt = &p_game->h_play_evt[0];
-	p_clnt->playing = true;
+	p_client->opp_pos = 1;
+	p_client->p_h_play_evt = &p_game->h_play_evt[0];
+	p_client->playing = true;
 
 	return E_SUCCESS;
 }
 
-int game_session_start(struct client *p_clnt)
+int game_session_start(struct client *p_client)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+	struct game *p_game = &p_client->p_env->game;
 	// DWORD wait_code;
 	int res;
 
@@ -240,9 +240,9 @@ int game_session_start(struct client *p_clnt)
 
 	if (p_game->accept_new_players) {
 		if (p_game->players_cnt == 0)
-			res = create_game(p_clnt);
+			res = create_game(p_client);
 		else
-			res = join_game(p_clnt);
+			res = join_game(p_client);
 	} else {
 		res = E_FAILURE;
 	}
@@ -254,25 +254,25 @@ int game_session_start(struct client *p_clnt)
 	return res;
 }
 
-int game_session_end(struct client *p_clnt)
+int game_session_end(struct client *p_client)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
-	if (!p_clnt->playing)
+	if (!p_client->playing)
 		return E_SUCCESS;
 
 	int res;
-	struct game *p_game = &p_clnt->p_env->game;
+	struct game *p_game = &p_client->p_env->game;
 
 	res = game_lock(p_game);
 
 	/* leave or destroy game */
 	switch (p_game->players_cnt) {
 	case 1:
-		res = destroy_game(p_clnt);
+		res = destroy_game(p_client);
 		break;
 	case 2:
-		res = leave_game(p_clnt);
+		res = leave_game(p_client);
 		break;
 	default:
 		break;
@@ -283,9 +283,9 @@ int game_session_end(struct client *p_clnt)
 	return res;
 }
 
-int game_session_write(struct client *p_clnt, char *data)
+int game_session_write(struct client *p_client, char *data)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
 	HANDLE h_file = NULL;
 	int res;
@@ -295,7 +295,7 @@ int game_session_write(struct client *p_clnt, char *data)
 	do {
 		h_file = CreateFileA(PATH_GAME_SESSION,
 				     GENERIC_WRITE,
-				     0,
+				     FILE_SHARE_READ | FILE_SHARE_WRITE,
 				     NULL,
 				     OPEN_EXISTING,
 				     FILE_ATTRIBUTE_NORMAL,
@@ -325,7 +325,7 @@ int game_session_write(struct client *p_clnt, char *data)
 		}
 
 		/* indicate write done */
-		if (!SetEvent(*(p_clnt->play_evt))) {
+		if (!SetEvent(*(p_client->p_h_play_evt))) {
 			PRINT_ERROR(E_WINAPI);
 			res = E_WINAPI;
 			break;
@@ -345,14 +345,14 @@ int game_session_write(struct client *p_clnt, char *data)
 		}
 	}
 
-	DBG_TRACE_STR(T, p_clnt->username, "write: %s", data);
+	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "write: %s", data);
 
 	return res;
 }
 
-int game_session_read(struct client *p_clnt, char *buffer)
+int game_session_read(struct client *p_client, char *buffer)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
 	HANDLE h_file = NULL;
 	int res;
@@ -361,7 +361,7 @@ int game_session_read(struct client *p_clnt, char *buffer)
 	do {
 		h_file = CreateFileA(PATH_GAME_SESSION,
 				     GENERIC_READ,
-				     0,
+				     FILE_SHARE_READ | FILE_SHARE_WRITE,
 				     NULL,
 				     OPEN_EXISTING,
 				     FILE_ATTRIBUTE_NORMAL,
@@ -390,15 +390,15 @@ int game_session_read(struct client *p_clnt, char *buffer)
 		}
 	}
 
-	DBG_TRACE_STR(T, p_clnt->username, "read: %s", buffer);
+	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "read: %s", buffer);
 	return res;
 }
 
-int game_sequence(struct client *p_clnt, char *write_buff, char *read_buff)
+int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
-	HANDLE *h_evt = &p_game->h_play_evt[p_clnt->op_pos];
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
+	struct game *p_game = &p_client->p_env->game;
+	HANDLE *h_evt = &p_game->h_play_evt[p_client->opp_pos];
 	DWORD wait_code;
 	int res;
 
@@ -407,27 +407,27 @@ int game_sequence(struct client *p_clnt, char *write_buff, char *read_buff)
 	if (res != E_SUCCESS)
 		return res;
 
-	DBG_TRACE_STR(T, p_clnt->username, "LOCK");
+	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "LOCK");
 
 	/* check if opponent wrote data */
 	wait_code = WaitForSingleObject(*h_evt, 0);
 	switch (wait_code) {
 	case WAIT_OBJECT_0:
 		/* read then write */
-		res = game_session_read(p_clnt, read_buff);
+		res = game_session_read(p_client, read_buff);
 		if (res != E_SUCCESS)
 			break;
-		res = game_session_write(p_clnt, write_buff);
+		res = game_session_write(p_client, write_buff);
 		break;
 	case WAIT_TIMEOUT:
 		/* write, wait, then read */
-		res = game_session_write(p_clnt, write_buff);
+		res = game_session_write(p_client, write_buff);
 		if (res != E_SUCCESS)
 			break;
 		res = game_release(p_game);
 		if (res != E_SUCCESS)
 			break;
-		DBG_TRACE_STR(T, p_clnt->username, "RELEASE");
+		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "RELEASE");
 		wait_code = WaitForSingleObject(*h_evt, 25000); // FIXME:
 		if (wait_code == WAIT_TIMEOUT) {
 			res = E_TIMEOUT;
@@ -436,8 +436,8 @@ int game_sequence(struct client *p_clnt, char *write_buff, char *read_buff)
 			res = game_lock(p_game);
 			if (res != E_SUCCESS)
 				break;
-			DBG_TRACE_STR(T, p_clnt->username, "LOCK");
-			res = game_session_read(p_clnt, read_buff);
+			DBG_TRACE_STR(TRACE_THREAD, p_client->username, "LOCK");
+			res = game_session_read(p_client, read_buff);
 			if (res != E_SUCCESS)
 				break;
 			break;
@@ -450,7 +450,7 @@ int game_sequence(struct client *p_clnt, char *write_buff, char *read_buff)
 	/* free game lock */
 	if (res != E_TIMEOUT) {
 		res |= game_release(p_game);
-		DBG_TRACE_STR(T, p_clnt->username, "RELEASE");
+		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "RELEASE");
 	}
 
 	return res;

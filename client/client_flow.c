@@ -45,7 +45,7 @@
 
 int flow_clnt_connect_attempt(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(!p_env->approved);
 
 	int res;
@@ -71,7 +71,7 @@ int flow_clnt_connect_attempt(struct client_env *p_env)
 
 int flow_clnt_disconnect(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(p_env->approved);
 
 	/* send disconncet message. if error occures there
@@ -88,10 +88,10 @@ int flow_clnt_disconnect(struct client_env *p_env)
 
 int flow_clnt_connect_failure(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int res;
 
-	DBG_TRACE_STR(C, p_env->username, "Error: %d", p_env->last_error);
+	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "Error: %d", p_env->last_error);
 
 	/* send disconnect if was approved. result
 	 * does not matter since we are in an error
@@ -101,7 +101,7 @@ int flow_clnt_connect_failure(struct client_env *p_env)
 		flow_clnt_disconnect(p_env);
 
 	/* print failure message */
-	UI_PRINT(UI_CONNECT_FAIL, p_env->serv_ip, p_env->serv_port);
+	UI_PRINT(UI_CONNECT_FAIL, p_env->server_ip, p_env->server_port);
 
 	/* close socket - terminate TCP connection */
 	res = closesocket(p_env->skt);
@@ -117,7 +117,7 @@ int flow_clnt_connect_failure(struct client_env *p_env)
 
 flow_clnt_reconnect_menu(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int choice;
 
 	/* print menu and await choice */
@@ -139,7 +139,7 @@ flow_clnt_reconnect_menu(struct client_env *p_env)
 
 int flow_clnt_client_request(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
@@ -178,11 +178,11 @@ int flow_clnt_client_request(struct client_env *p_env)
 
 int flow_clnt_connect_denied(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(!p_env->approved);
 
 	/* print message */
-	UI_PRINT(UI_CONNECT_DENY, p_env->serv_ip, p_env->serv_port);
+	UI_PRINT(UI_CONNECT_DENY, p_env->server_ip, p_env->server_port);
 
 	/* go to reconnect menu */
 	return STATE_RECONNECT_MENU;
@@ -190,14 +190,14 @@ int flow_clnt_connect_denied(struct client_env *p_env)
 
 int flow_clnt_connect_approved(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(!p_env->approved);
 
 	/* change approval state */
 	p_env->approved = true;
 
 	/* print user notification */
-	UI_PRINT(UI_CONNECTED, p_env->serv_ip, p_env->serv_port);
+	UI_PRINT(UI_CONNECTED, p_env->server_ip, p_env->server_port);
 
 	/* go to next state */
 	return STATE_MAIN_MENU;
@@ -205,7 +205,7 @@ int flow_clnt_connect_approved(struct client_env *p_env)
 
 int flow_clnt_main_menu(struct client_env *p_env)
 {	
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(p_env->approved);
 	struct msg *p_msg;
 	int res, choice;
@@ -246,7 +246,7 @@ int flow_clnt_main_menu(struct client_env *p_env)
 
 int flow_clnt_invite_and_setup(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int number;
 	char buff[5] = {0};
@@ -291,7 +291,7 @@ int flow_clnt_invite_and_setup(struct client_env *p_env)
 
 int flow_clnt_ask_for_game(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(p_env->approved);
 
 	struct msg *p_msg = NULL;
@@ -328,7 +328,7 @@ int flow_clnt_ask_for_game(struct client_env *p_env)
 
 int flow_clnt_undefined_flow(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	PRINT_ERROR(E_FLOW);
 	
 	/* handle accorsing to approval state */
@@ -343,7 +343,7 @@ int flow_clnt_undefined_flow(struct client_env *p_env)
 
 int flow_clnt_game_play(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(C, p_env->username);
+	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
 	int number;
@@ -356,7 +356,7 @@ int flow_clnt_game_play(struct client_env *p_env)
 	}
 	
 	// if (p_msg->type == MSG_SERVER_GAME_RESULTS)
-	// 	DBG_TRACE_STR(C, p_env->username, "after rec"); // FIXME:
+	// 	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "after rec"); // FIXME:
 
 	switch (p_msg->type) {
 	case MSG_SERVER_PLAYER_MOVE_REQUEST:

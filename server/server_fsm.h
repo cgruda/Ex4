@@ -1,7 +1,7 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client side
+ * server program
  *
  * server_fsm.h
  * 
@@ -41,7 +41,7 @@ enum server_fsm {
  ==============================================================================
  */
 
-int(*server_fsm[SERVER_FSM_MAX])(struct client *p_clnt);
+int(*server_fsm[SERVER_FSM_MAX])(struct client *p_client);
 
 /**
  ******************************************************************************

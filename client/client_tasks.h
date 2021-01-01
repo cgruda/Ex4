@@ -19,9 +19,6 @@
  */
 
 #include <windows.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdbool.h>
 
 /*
@@ -30,7 +27,7 @@
  ==============================================================================
  */
 
-#define ARGC                 4
+#define CLIENT_ARGC          4
 #define MAX_USERNAME_LEN     20
 
 /*
@@ -39,13 +36,11 @@
  ==============================================================================
  */
 
-struct client_env
-{
-	char  *serv_ip;
-	unsigned short serv_port;
-	char  *username;
-
+struct client_env {
 	int skt;
+	char  *server_ip;
+	USHORT server_port;
+	char *username;
 	bool approved;
 	SOCKADDR_IN server;
 	int last_error;
@@ -79,9 +74,9 @@ int client_init(struct client_env *p_env);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @return
+ * @brief cleanup client resources
+ * @param p_env pointer to env
+ * @return E_SUCCESS on success
  ******************************************************************************
  */
 int client_cleanup(struct client_env *p_env);

@@ -110,11 +110,10 @@ int my_atoi(char *str, int *p_result)
 
 #if DBG_TRACE
 
-char *dbg_trace_mode_2_str[DBG_TRACE_MODE_MAX] =
-{
-	[C] = "client_",
-	[T] = "thread_",
-	[S] = "",
+char *dbg_trace_mode_2_str[TRACE_MAX] = {
+	[TRACE_CLIENT] = "client_",
+	[TRACE_THREAD] = "thread_",
+	[TRACE_SERVER] = "",
 };
 
 char *dbg_trace_get_path(int mode, char *name)

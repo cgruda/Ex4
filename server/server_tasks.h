@@ -35,7 +35,7 @@
  */
 
 // input arguments count
-#define ARGC                         3
+#define SERVER_ARGC                         3
 
 // allow 3 threads to be created
 #define MAX_CONNECTIONS              3
@@ -51,33 +51,29 @@
  */
 
 struct client {
-	int id;
-	int last_err;
 	int skt;
-	struct serv_env *p_env;
-	char *username;
-	char setup_numbers[5]; // FIXME:
-	char *opp_username;
 	bool connected;
 	bool playing;
-	HANDLE *play_evt;
-	int op_pos;
+	char *username;
+	char *opp_username;
+	int   opp_pos;
+	char setup_numbers[5];
+	HANDLE *p_h_play_evt;
+	int last_err;
+	struct serv_env *p_env;
 };
 
 struct serv_env {
-	// server handling params
 	WSADATA	wsa_data;
-	int serv_skt;
-	char *serv_ip;
-	USHORT serv_port;
+	int server_skt;
+	char *server_ip;
+	USHORT server_port;
 	SOCKADDR_IN server;
-	// control params
-	HANDLE h_players_smpr;
+	HANDLE h_client_approve_smpr;
 	HANDLE h_abort_evt;
-	HANDLE h_file_stdin;
+	HANDLE h_stdin;
 	OVERLAPPED olp_stdin;
 	char buffer[7]; // FIXME:
-	// clients
 	DWORD thread_bitmap;
 	struct client client[MAX_CONNECTIONS];
 	HANDLE h_client_thread[MAX_CONNECTIONS];
@@ -150,7 +146,7 @@ int serv_clnt_connect(struct serv_env *p_env);
 /**
  ******************************************************************************
  * @brief wrapper for creating and sending message from server to client
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @param type of message to be sent
  * @param p0-3 parameters to be sent
  * @return E_SUCCESS - all good
@@ -159,7 +155,7 @@ int serv_clnt_connect(struct serv_env *p_env);
  *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int server_send_msg(struct client *p_clnt, int type,
+int server_send_msg(struct client *p_client, int type,
 	char *p0, char *p1, char *p2, char *p3);
 
 /**
@@ -167,7 +163,7 @@ int server_send_msg(struct client *p_clnt, int type,
  * @brief wrapper for receiving message from client, this wrapper splits
  *        the timeout into MSG_TIME_INCERMENT to allow checking if thread
  *        got abort from main thread.
- * @param p_clnt pointer to client object
+ * @param p_client pointer to client object
  * @param p_p_msg pointer to message pointer to get message
  * @param timeout sec timeout in seconds
  * @return E_SUCCESS - all good
@@ -176,7 +172,7 @@ int server_send_msg(struct client *p_clnt, int type,
  *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int server_recv_msg(struct client *p_clnt, struct msg **p_p_msg, int timeout_sec);
+int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_sec);
 
 /**
  ******************************************************************************

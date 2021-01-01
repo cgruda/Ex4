@@ -46,7 +46,7 @@ int check_input(struct serv_env *p_env, int argc, char **argv)
 	int port;
 
 	/* check number of arguments */
-	if (argc != ARGC) {
+	if (argc != SERVER_ARGC) {
 		print_usage();
 		return E_FAILURE;
 	}
@@ -56,7 +56,7 @@ int check_input(struct serv_env *p_env, int argc, char **argv)
 		printf("\n%s is not a valid ip addres", argv[1]);
 		ret_val = E_FAILURE;
 	}
-	p_env->serv_ip = argv[1];
+	p_env->server_ip = argv[1];
 
 	/* check port number */
 	port = strtol(argv[2], NULL, 10);
@@ -64,7 +64,7 @@ int check_input(struct serv_env *p_env, int argc, char **argv)
 		printf("\n%s is not a valid port", argv[2]);
 		ret_val = E_FAILURE;
 	}
-	p_env->serv_port = port;
+	p_env->server_port = port;
 
 	if (ret_val != E_SUCCESS)
 		print_usage();
@@ -77,14 +77,14 @@ int serv_quit_init(struct serv_env *p_env)
 	int res;
 	
 	/* create file handle for stdin */
-	p_env->h_file_stdin = CreateFileA(PATH_STDIN,           /* standard input    */
+	p_env->h_stdin = CreateFileA(PATH_STDIN,           /* standard input    */
 					  GENERIC_READ,         /* we want to read   */
 					  FILE_SHARE_READ,      /* others may use    */
 					  NULL,                 /* default security  */
 					  OPEN_EXISTING,        /* stdin exists      */
 					  FILE_FLAG_OVERLAPPED, /* asynchronous read */
 					  NULL);                /* no template       */
-	if (p_env->h_file_stdin == INVALID_HANDLE_VALUE) {
+	if (p_env->h_stdin == INVALID_HANDLE_VALUE) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
@@ -101,7 +101,7 @@ int serv_quit_init(struct serv_env *p_env)
 	 * error is detected by checking WSA last error.
 	 * io_pending designates i/o pending completion,
 	 * and is thus not treated as an error. */
-	res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin); // FIXME: 4
+	res = ReadFile(p_env->h_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin); // FIXME: 4
 	if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -122,26 +122,26 @@ int serv_comm_init(struct serv_env *p_env)
 	}
 
 	/* create socket */
-	p_env->serv_skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	if (p_env->serv_skt == SOCKET_ERROR) {
+	p_env->server_skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	if (p_env->server_skt == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
 		return E_WINSOCK;
 	}
 
 	/* set server address */
 	p_env->server.sin_family      = AF_INET;
-	p_env->server.sin_addr.s_addr = inet_addr(p_env->serv_ip);
-	p_env->server.sin_port        = htons(p_env->serv_port);
+	p_env->server.sin_addr.s_addr = inet_addr(p_env->server_ip);
+	p_env->server.sin_port        = htons(p_env->server_port);
 
 	/* bind socket to ip and port */
-	res = bind(p_env->serv_skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
+	res = bind(p_env->server_skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
 		return E_WINSOCK;
 	}
 
 	/* place socket in listening state */
-	res = listen(p_env->serv_skt, SOMAXCONN);
+	res = listen(p_env->server_skt, SOMAXCONN);
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
 		return E_WINSOCK;
@@ -153,8 +153,8 @@ int serv_comm_init(struct serv_env *p_env)
 int serv_ctrl_init(struct serv_env *p_env)
 {
 	/* semaphore to restrict max players */
-	p_env->h_players_smpr = CreateSemaphore(NULL, GAME_MAX_PLAYERS, GAME_MAX_PLAYERS, NULL);
-	if (p_env->h_players_smpr == NULL) {
+	p_env->h_client_approve_smpr = CreateSemaphore(NULL, GAME_MAX_PLAYERS, GAME_MAX_PLAYERS, NULL);
+	if (p_env->h_client_approve_smpr == NULL) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
@@ -174,7 +174,7 @@ int serv_ctrl_init(struct serv_env *p_env)
 
 int server_init(struct serv_env *p_env)
 {
-	DBG_TRACE_INIT(S, SERVER);
+	DBG_TRACE_INIT(TRACE_SERVER, SERVER);
 	int res;
 
 	/* quit logic init */
@@ -197,7 +197,7 @@ int server_init(struct serv_env *p_env)
 	if (res != E_SUCCESS)
 		return res;
 
-	DBG_TRACE_FUNC(S, SERVER);
+	DBG_TRACE_FUNC(TRACE_SERVER, SERVER);
 	return E_SUCCESS;
 }
 
@@ -235,7 +235,7 @@ bool server_quit(struct serv_env *p_env)
 	 	 * error is detected by checking WSA last error.
 	 	 * io_pending designates i/o pending completion,
 	 	 * and is thus not treated as an error. */
-		res = ReadFile(p_env->h_file_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
+		res = ReadFile(p_env->h_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
 		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
 			PRINT_ERROR(E_WINAPI);
 			p_env->last_err = E_WINAPI;
@@ -243,14 +243,14 @@ bool server_quit(struct serv_env *p_env)
 		}
 		return false;
 	} else {
-		DBG_TRACE_STR(S, SERVER, "server_quit!");	
+		DBG_TRACE_STR(TRACE_SERVER, SERVER, "server_quit!");	
 		return true;
 	}
 }
 
 int server_destroy_clients(struct serv_env *p_env)
 {
-	DBG_TRACE_FUNC(S, SERVER);
+	DBG_TRACE_FUNC(TRACE_SERVER, SERVER);
 	int res;
 	
 	/* set abort event */
@@ -277,10 +277,10 @@ int serv_clnt_connect(struct serv_env *p_env)
 	// char buffer[100];
 
 	FD_ZERO(&readfs);
-	FD_SET(p_env->serv_skt, &readfs);
+	FD_SET(p_env->server_skt, &readfs);
 
 	/* wait for socket to be signald */
-	res = select(p_env->serv_skt + 1, &readfs, NULL, NULL, &tv);
+	res = select(p_env->server_skt + 1, &readfs, NULL, NULL, &tv);
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
 		return E_WINSOCK;
@@ -291,12 +291,12 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 		/* check if more connections can be accepted */
 		if (!BitScanForward(&idx, ~p_env->thread_bitmap)) {
-			DBG_TRACE_STR(S, SERVER, "max TCP connections! incoming connection refused");
+			DBG_TRACE_STR(TRACE_SERVER, SERVER, "max TCP connections! incoming connection refused");
 			return E_SUCCESS;
 		}
 
 		/* accept incoming connection */
-		new_skt = accept(p_env->serv_skt, NULL, NULL);
+		new_skt = accept(p_env->server_skt, NULL, NULL);
 		if (new_skt == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
 			return E_WINSOCK;
@@ -305,7 +305,6 @@ int serv_clnt_connect(struct serv_env *p_env)
 		/* set client params */
 		p_client = &p_env->client[idx];
 		memset(p_client, 0, sizeof(*p_client));
-		p_client->id = idx;
 		p_client->skt = new_skt;
 		p_client->p_env = p_env;
 
@@ -323,7 +322,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 		/* mark thread handle as taken */
 		SET_BIT(p_env->thread_bitmap, idx);
-		DBG_TRACE_STR(S, SERVER, "start TCP connection %d", idx);
+		DBG_TRACE_STR(TRACE_SERVER, SERVER, "start TCP connection %d", idx);
 	}
 	
 	return E_SUCCESS;
@@ -350,7 +349,7 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 				PRINT_ERROR(E_WINAPI);
 				return E_WINAPI;
 			}
-			DBG_TRACE_STR(S, SERVER, "end TCP connection   %d", idx);
+			DBG_TRACE_STR(TRACE_SERVER, SERVER, "end TCP connection   %d", idx);
 			CLR_BIT(p_env->thread_bitmap, idx);
 			break;
 		case WAIT_FAILED:
@@ -382,7 +381,7 @@ bool server_check_abort(struct serv_env *p_env)
 
 int server_cleanup(struct serv_env *p_env)
 {
-	DBG_TRACE_FUNC(S, SERVER);
+	DBG_TRACE_FUNC(TRACE_SERVER, SERVER);
 	int ret_val = p_env->last_err;
 
 	if (p_env->olp_stdin.hEvent) {
@@ -392,22 +391,22 @@ int server_cleanup(struct serv_env *p_env)
 		}
 	}
 
-	if (p_env->h_file_stdin) {
-		if (!CloseHandle(p_env->h_file_stdin)) {
+	if (p_env->h_stdin) {
+		if (!CloseHandle(p_env->h_stdin)) {
 			PRINT_ERROR(E_WINAPI);
 			ret_val = E_WINAPI;
 		}
 	}
 
-	if (p_env->serv_skt != INVALID_SOCKET) {
-		if (closesocket(p_env->serv_skt) == SOCKET_ERROR) {
+	if (p_env->server_skt != INVALID_SOCKET) {
+		if (closesocket(p_env->server_skt) == SOCKET_ERROR) {
 			PRINT_ERROR(E_WINSOCK);
 			ret_val = E_WINSOCK;
 		}
 	}
 
-	if (p_env->h_players_smpr) {
-		if (!CloseHandle(p_env->h_players_smpr)) {
+	if (p_env->h_client_approve_smpr) {
+		if (!CloseHandle(p_env->h_client_approve_smpr)) {
 			PRINT_ERROR(E_WINAPI);
 			ret_val = E_WINAPI;
 		}
@@ -432,9 +431,9 @@ int server_cleanup(struct serv_env *p_env)
 	return ret_val;
 }
 
-int server_send_msg(struct client *p_clnt, int type, char *p0, char *p1, char *p2, char *p3)
+int server_send_msg(struct client *p_client, int type, char *p0, char *p1, char *p2, char *p3)
 {
-	DBG_TRACE_FUNC(T, p_clnt->username);
+	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 	struct msg *p_msg = NULL;
 	int res;
 
@@ -444,8 +443,8 @@ int server_send_msg(struct client *p_clnt, int type, char *p0, char *p1, char *p
 		return E_STDLIB;
 
 	/* send message */
-	res = send_msg(p_clnt->skt, &p_msg);
-	DBG_TRACE_MSG(T, p_clnt->username, p_msg);
+	res = send_msg(p_client->skt, &p_msg);
+	DBG_TRACE_MSG(TRACE_THREAD, p_client->username, p_msg);
 
 	/* free message */
 	free_msg(&p_msg);
@@ -453,10 +452,10 @@ int server_send_msg(struct client *p_clnt, int type, char *p0, char *p1, char *p
 	return res;
 }
 
-int server_recv_msg(struct client *p_clnt, struct msg **p_p_msg, int timeout_sec)
+int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_sec)
 {
-	if (p_clnt->connected)
-		DBG_TRACE_FUNC(T, p_clnt->username);
+	if (p_client->connected)
+		DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 	
 	TIMEVAL tv;
 	int res = E_SUCCESS;
@@ -465,20 +464,20 @@ int server_recv_msg(struct client *p_clnt, struct msg **p_p_msg, int timeout_sec
 
 	while (incerments--) {
 
-		if (server_check_abort(p_clnt->p_env))
+		if (server_check_abort(p_client->p_env))
 			return E_INTERNAL;
 
 		tv.tv_sec  = 0;
 		tv.tv_usec = MSG_TIME_INCERMENT_USEC;
-		res = recv_msg(p_p_msg, p_clnt->skt, &tv);
+		res = recv_msg(p_p_msg, p_client->skt, &tv);
 		if (res == E_TIMEOUT)
 			continue;
 		else
 			break;
 	}
 
-	if (p_clnt->connected && (res == E_SUCCESS))
-		DBG_TRACE_MSG(T, p_clnt->username, *p_p_msg);
+	if (p_client->connected && (res == E_SUCCESS))
+		DBG_TRACE_MSG(TRACE_THREAD, p_client->username, *p_p_msg);
 
 	return res;
 }

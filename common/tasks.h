@@ -33,7 +33,6 @@
 #define DBG_TRACE      1
 #define SERVER         "server"
 
-
 // times
 #define MS2US                1000
 #define SEC2MS               1000
@@ -47,8 +46,7 @@
  ==============================================================================
  */
 
-enum err_val
-{
+enum err_val {
 	E_SUCCESS = 0,
 	E_FAILURE,
 	E_INTERNAL,
@@ -112,14 +110,11 @@ int my_atoi(char *str, int *p_result);
 void print_error(int err_val);
 
 
-
-
-enum dbg_trace_mode
-{
-	C,
-	S,
-	T,
-	DBG_TRACE_MODE_MAX,
+enum trace_mode {
+	TRACE_CLIENT,
+	TRACE_SERVER,
+	TRACE_THREAD,
+	TRACE_MAX,
 };
 
 #if DBG_TRACE
