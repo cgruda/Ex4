@@ -27,6 +27,7 @@
 #include "server_fsm.h"
 #include "message.h"
 #include "tasks.h"
+#include "game.h"
 
 /*
  ==============================================================================
@@ -76,7 +77,7 @@ int serv_quit_init(struct serv_env *p_env)
 	int res;
 	
 	/* create file handle for stdin */
-	p_env->h_file_stdin = CreateFileA(PATH_STDIN,              /* standard input    */
+	p_env->h_file_stdin = CreateFileA(PATH_STDIN,           /* standard input    */
 					  GENERIC_READ,         /* we want to read   */
 					  FILE_SHARE_READ,      /* others may use    */
 					  NULL,                 /* default security  */
@@ -152,7 +153,7 @@ int serv_comm_init(struct serv_env *p_env)
 int serv_ctrl_init(struct serv_env *p_env)
 {
 	/* semaphore to restrict max players */
-	p_env->h_players_smpr = CreateSemaphore(NULL, MAX_PLAYERS, MAX_PLAYERS, NULL);
+	p_env->h_players_smpr = CreateSemaphore(NULL, GAME_MAX_PLAYERS, GAME_MAX_PLAYERS, NULL);
 	if (p_env->h_players_smpr == NULL) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -170,38 +171,6 @@ int serv_ctrl_init(struct serv_env *p_env)
 
 	return E_SUCCESS;
 }
-
-// TODO: cleanup
-int serv_game_init(struct serv_env *p_env)
-{
-	struct game *p_game = &p_env->game;
-
-	p_game->h_play_evt[0] = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (!p_game->h_play_evt[0]) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	p_game->h_play_evt[1] = CreateEvent(NULL, FALSE, FALSE, NULL);
-	if (!p_game->h_play_evt[1]) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	/* mutex to sync game session update */
-	p_game->h_game_mtx = CreateMutex(NULL, FALSE, NULL);
-	if (p_game->h_game_mtx == NULL) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	p_game->players_cnt = 0; // FIXME:
-	p_game->accept_new_players = true;
-
-	return E_SUCCESS;
-}
-
-
 
 int server_init(struct serv_env *p_env)
 {
@@ -224,7 +193,7 @@ int server_init(struct serv_env *p_env)
 		return res;
 
 	/* communication logic init */
-	res = serv_game_init(p_env);
+	res = game_init(&p_env->game);
 	if (res != E_SUCCESS)
 		return res;
 
@@ -232,13 +201,13 @@ int server_init(struct serv_env *p_env)
 	return E_SUCCESS;
 }
 
-bool server_quit(struct serv_env *p_env) // TODO: split 2
+bool server_quit(struct serv_env *p_env)
 {
 	DWORD wait_code;
 	int res;
 
 	/* check stdin input event */
-	wait_code = WaitForSingleObject(p_env->olp_stdin.hEvent, 1);
+	wait_code = WaitForSingleObject(p_env->olp_stdin.hEvent, 100);
 	switch (wait_code) {
 	case WAIT_OBJECT_0:
 		break;
@@ -279,7 +248,6 @@ bool server_quit(struct serv_env *p_env) // TODO: split 2
 	}
 }
 
-
 int server_destroy_clients(struct serv_env *p_env)
 {
 	DBG_TRACE_FUNC(S, SERVER);
@@ -296,14 +264,12 @@ int server_destroy_clients(struct serv_env *p_env)
 	return res;
 }
 
-
-
 int serv_clnt_connect(struct serv_env *p_env)
 {
 	int res;
 	int new_skt;
 	struct client *p_client = NULL;
-	HANDLE *p_h_clnt_thread = NULL;
+	HANDLE *p_h_client_thread = NULL;
 	FD_SET readfs;
 	DWORD idx;
 	TIMEVAL tv = {0, 1000}; // FIXME:
@@ -344,9 +310,9 @@ int serv_clnt_connect(struct serv_env *p_env)
 		p_client->p_env = p_env;
 
 		/* create new thread to handle connection */
-		p_h_clnt_thread = &p_env->h_clnt_thread[idx];
-		*p_h_clnt_thread = CreateThread(NULL, 0, clnt_thread, (LPVOID)p_client, 0, NULL);
-		if (!*p_h_clnt_thread) {
+		p_h_client_thread = &p_env->h_client_thread[idx];
+		*p_h_client_thread = CreateThread(NULL, 0, client_thread, (LPVOID)p_client, 0, NULL);
+		if (!*p_h_client_thread) {
 			PRINT_ERROR(E_WINAPI);
 			if (closesocket(p_client->skt) == SOCKET_ERROR) {
 				PRINT_ERROR(E_WINSOCK);
@@ -363,25 +329,24 @@ int serv_clnt_connect(struct serv_env *p_env)
 	return E_SUCCESS;
 }
 
-
 int server_check_thread_status(struct serv_env *p_env, int ms)
 {
 	DWORD wait_code;
-	HANDLE *p_h_clnt_thread = NULL;
+	HANDLE *p_h_client_thread = NULL;
 
 	for (int idx = 0; idx < MAX_CONNECTIONS; idx++) {
 
 		if (!TEST_BIT(p_env->thread_bitmap, idx))
 			continue;
 		
-		p_h_clnt_thread = &p_env->h_clnt_thread[idx];
-		wait_code = WaitForSingleObject(*p_h_clnt_thread, ms);
+		p_h_client_thread = &p_env->h_client_thread[idx];
+		wait_code = WaitForSingleObject(*p_h_client_thread, ms);
 		switch (wait_code)
 		{
 		case WAIT_TIMEOUT:
 			break;
 		case WAIT_OBJECT_0:
-			if (!CloseHandle(*p_h_clnt_thread)) {
+			if (!CloseHandle(*p_h_client_thread)) {
 				PRINT_ERROR(E_WINAPI);
 				return E_WINAPI;
 			}
@@ -399,7 +364,6 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 	return E_SUCCESS;
 }
 
-
 bool server_check_abort(struct serv_env *p_env)
 {
 	DWORD wait_code;
@@ -415,7 +379,6 @@ bool server_check_abort(struct serv_env *p_env)
 		return true;
 	}
 }
-
 
 int server_cleanup(struct serv_env *p_env)
 {
@@ -457,25 +420,8 @@ int server_cleanup(struct serv_env *p_env)
 		}
 	}
 
-	if (p_env->game.h_game_mtx) {
-		if (!CloseHandle(p_env->game.h_game_mtx)) {
-			PRINT_ERROR(E_WINAPI);
-			ret_val = E_WINAPI;
-		}
-	}
-
-	if (p_env->game.h_play_evt[0]) {
-		if (!CloseHandle(p_env->game.h_play_evt[0])) {
-			PRINT_ERROR(E_WINAPI);
-			ret_val = E_WINAPI;
-		}
-	}
-	
-	if (p_env->game.h_play_evt[1]) {
-		if (!CloseHandle(p_env->game.h_play_evt[1])) {
-			PRINT_ERROR(E_WINAPI);
-			ret_val = E_WINAPI;
-		}
+	if (game_cleanup(&p_env->game) != E_SUCCESS) {
+		ret_val = E_WINAPI;
 	}
 
 	if (WSACleanup()) {
@@ -531,450 +477,8 @@ int server_recv_msg(struct client *p_clnt, struct msg **p_p_msg, int timeout_sec
 			break;
 	}
 
-	if (p_clnt->connected)
+	if (p_clnt->connected && (res == E_SUCCESS))
 		DBG_TRACE_MSG(T, p_clnt->username, *p_p_msg);
 
 	return res;
-}
-
-
-
-
-
-
-enum player_position
-{
-	SLAVE,
-	MASTER,
-};
-
-
-
-
-
-int game_lock(struct game *p_game)
-{
-	DWORD wait_code;
-
-	wait_code = WaitForSingleObject(p_game->h_game_mtx, 5000);
-	switch (wait_code) {
-	case WAIT_FAILED:
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	case WAIT_OBJECT_0:
-		return E_SUCCESS;
-	case WAIT_TIMEOUT:
-		PRINT_ERROR(E_INTERNAL);
-		return E_TIMEOUT;
-	default:
-		return E_FAILURE;
-	}
-}
-
-int game_release(struct game *p_game)
-{
-	int res;
-
-	res = ReleaseMutex(p_game->h_game_mtx);
-	if (!res) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	return E_SUCCESS;
-}
-
-
-
-int destroy_game(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
-
-	if (!ResetEvent(*(p_clnt->play_evt))) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	/* delete game session file */
-	if (!DeleteFileA(PATH_GAME_SESSION)) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	/* update game */
-	p_game->players_cnt = 0;
-	p_game->accept_new_players = true;
-	
-	/* update client */
-	p_clnt->play_evt = NULL;
-	p_clnt->playing = false;
-	p_clnt->op_pos = 0; // FIXME:
-
-
-	return E_SUCCESS;
-}
-
-int leave_game(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-
-	struct game *p_game = &p_clnt->p_env->game;
-
-	if (!ResetEvent(*(p_clnt->play_evt))) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	/* update client */
-	p_clnt->play_evt = NULL;
-	p_clnt->playing = false;
-	p_clnt->op_pos = 0; // FIXME:
-
-	/* update game */
-	p_game->players_cnt--;
-
-	return E_SUCCESS;
-}
-
-
-int join_game(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-
-	struct game *p_game = &p_clnt->p_env->game;
-
-	/* update client */
-	p_clnt->op_pos = 0;
-	p_clnt->play_evt = &p_game->h_play_evt[1];
-	p_clnt->playing = true;
-
-	/* update game */
-	p_game->players_cnt++;
-	p_game->accept_new_players = false;
-
-	if (!SetEvent(*(p_clnt->play_evt))) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	return E_SUCCESS;
-}
-
-int create_game(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
-	HANDLE h_file = NULL;
-
-	/* create session file */
-	h_file = CreateFileA(PATH_GAME_SESSION,     /* GameSession path    */
-			     0,                     /* no access needed    */
-			     0,                     /* no share            */
-			     NULL,                  /* default security    */
-			     CREATE_ALWAYS,         /* create file         */
-			     FILE_ATTRIBUTE_NORMAL, /* asynchronous read   */
-			     NULL);                 /* no template         */
-	if (!h_file) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	/* close handle to session file */
-	if (!CloseHandle(h_file)) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	/* update game */
-	p_game->players_cnt++;
-
-	/* update client */
-	p_clnt->op_pos = 1;
-	p_clnt->play_evt = &p_game->h_play_evt[0];
-	p_clnt->playing = true;
-
-	if (!SetEvent(*(p_clnt->play_evt))) {
-		PRINT_ERROR(E_WINAPI);
-		return E_WINAPI;
-	}
-
-	return E_SUCCESS;
-}
-
-
-
-int game_session_start(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	struct game *p_game = &p_clnt->p_env->game;
-	DWORD wait_code;
-	int res;
-
-	/* aquaire game mutex */
-	res = game_lock(p_game);
-	if (res != E_SUCCESS)
-		return res;
-
-	if (p_game->accept_new_players) {
-		if (p_game->players_cnt == 0)
-			res = create_game(p_clnt);
-		else
-			res = join_game(p_clnt);
-	} else {
-		res = E_FAILURE;
-	}
-
-	res |= game_release(p_game);
-	if (res != E_SUCCESS)
-		return res;
-
-	wait_code = WaitForSingleObject(p_game->h_play_evt[p_clnt->op_pos], 27000); // FIXME:
-	switch (wait_code) {
-	case WAIT_TIMEOUT:
-		return E_TIMEOUT;
-	case WAIT_OBJECT_0:
-		return E_SUCCESS;
-	case WAIT_FAILED:
-		PRINT_ERROR(E_WINAPI);
-		/* fall through */
-	default:
-		res = E_WINAPI;
-	}
-
-	return res;
-}
-
-int game_session_end(struct client *p_clnt)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-
-	int res;
-	struct game *p_game = &p_clnt->p_env->game;
-
-	res = game_lock(p_game);
-
-	if (p_game->players_cnt == 2)
-		res = leave_game(p_clnt);
-	else
-		res = destroy_game(p_clnt);
-
-	res |= game_release(p_game);
-
-	return res;
-}
-
-#define GAME_VALID(p_game) (p_game->players_cnt == MAX_PLAYERS)
-
-
-int game_session_write(struct client *p_clnt, char *data)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-	DBG_TRACE_STR(T, p_clnt->username, "write: %s", data);
-
-	HANDLE h_file = NULL;
-	int res;
-	int buffer_size;
-	char *buffer = NULL;
-
-	do {
-		h_file = CreateFileA(PATH_GAME_SESSION,
-				     GENERIC_WRITE,
-				     0,
-				     NULL,
-				     OPEN_EXISTING,
-				     FILE_ATTRIBUTE_NORMAL,
-				     NULL);
-		if (!h_file) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-
-		buffer_size = strlen(data) + 1;
-		buffer = calloc(buffer_size, 1);
-		if (!buffer) {
-			PRINT_ERROR(E_STDLIB);
-			res = E_STDLIB;
-			break;
-		}
-
-		memcpy(buffer, data, strlen(data));
-
-		/* write */
-		res = WriteFile(h_file, buffer, buffer_size, NULL, NULL);
-		if (!res) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		/* indicate write done */
-		if (!SetEvent(*(p_clnt->play_evt))) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		res = E_SUCCESS;
-
-	} while (0);
-	
-	/* cleanup */
-	if (buffer)
-		free(buffer);
-	if (h_file) {
-		if (!CloseHandle(h_file)) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-		}
-	}
-
-	return res;
-}
-
-
-int game_session_read(struct client *p_clnt, char *buffer)
-{
-	DBG_TRACE_FUNC(T, p_clnt->username);
-
-	HANDLE h_file = NULL;
-	int res;
-	buffer[0] = 0;
-
-	do {
-		h_file = CreateFileA(PATH_GAME_SESSION,
-				     GENERIC_READ,
-				     0,
-				     NULL,
-				     OPEN_EXISTING,
-				     FILE_ATTRIBUTE_NORMAL,
-				     NULL);
-		if (!h_file) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		res = ReadFile(h_file, buffer, 23, NULL, NULL);
-		if (!res) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-			break;
-		}
-
-		res = E_SUCCESS;
-
-	} while (0);
-
-	if (h_file) {
-		if (!CloseHandle(h_file)) {
-			PRINT_ERROR(E_WINAPI);
-			res = E_WINAPI;
-		}
-	}
-
-	DBG_TRACE_STR(T, p_clnt->username, "read: %s", buffer);
-	return res;
-}
-
-
-int session_sequence(struct client *p_clnt, char *buffer)
-{
-	struct game *p_game = &p_clnt->p_env->game;
-	HANDLE *h_opponent_evt = p_game->h_play_evt[p_clnt->op_pos];
-	int res;
-	DWORD wait_code;
-	char write[25] = {0};
-	memcpy(write, buffer, strlen(buffer));
-
-	/* acquire file lock */
-	res = game_lock(p_game);
-	if (res != E_SUCCESS)
-		return res;
-
-	/* check if opponent wrote data */
-	wait_code = WaitForSingleObject(h_opponent_evt, 0);
-	switch (wait_code) {
-	case WAIT_OBJECT_0:
-		/* read, then write */
-		res = game_session_read(p_clnt, buffer);
-		if (res != E_SUCCESS)
-			break;
-		res = game_session_write(p_clnt, write);
-		break;
-	case WAIT_TIMEOUT:
-		/* write, then wait */
-		res = game_session_write(p_clnt, write);
-		if (res != E_SUCCESS)
-			break;
-		/* relase lock (to allow opponent to write) */
-		res = game_release(p_game);
-		if (res != E_SUCCESS)
-			break;
-		/* wait for opponents signal */
-		wait_code = WaitForSingleObject(h_opponent_evt, 25000);
-		switch (wait_code) {
-		case WAIT_TIMEOUT:
-			/* opponent didnt write */
-			res = E_TIMEOUT;
-			break;
-		case WAIT_OBJECT_0:
-			/* lock to read opponent data */
-			res = game_lock(p_game);
-			if (res != E_SUCCESS)
-				break;
-			/* read */
-			res = game_session_read(p_clnt, buffer);
-			if (res != E_SUCCESS)
-				break;
-			break;
-		case WAIT_FAILED:
-			PRINT_ERROR(E_WINAPI);
-		default:
-			res = E_WINAPI;
-		}
-		break;
-	case WAIT_FAILED:
-		PRINT_ERROR(E_WINAPI);
-	default:
-		res = E_WINAPI;
-	}
-
-	if (res != E_TIMEOUT)
-		res |= game_release(p_game);
-
-	return res;
-}
-
-
-int game_bulls(char *a, char *b)
-{
-	int bulls = 0;
-
-	for (int i = 0; i < 4; i++)
-		if (a[i] == b[i])
-			bulls++;
-
-	return bulls;
-}
-
-
-int game_cows(char *a, char *b)
-{
-	int cows = 0;
-
-	for (int i = 0; i < 4; i++) {
-		for (int j = 0; j < 4; j++) {
-			if (i == j)
-				continue;
-			if (a[i] == b[j]) {
-				cows++;
-				break;
-			}
-		}
-	}
-
-	return cows;
 }

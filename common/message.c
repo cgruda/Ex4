@@ -207,7 +207,8 @@ struct msg *new_msg(int type, char *p0, char *p1, char *p2, char *p3)
 	}
 
 	/* set params count */
-	for(;p_msg->param_lst[p_msg->param_cnt]; p_msg->param_cnt++);
+	for (int i = 0; i < MSG_MAX_PARAMS && p_msg->param_lst[i]; i++)
+		p_msg->param_cnt++;
 
 	return p_msg;
 }
@@ -231,11 +232,10 @@ void free_msg(struct msg **p_p_msg)
 
 void print_msg(struct msg *p_msg)
 {
-	printf("\n\tmsg:\n");
 	if (!p_msg) {
-		printf("\t\tNULL\n");
+		printf("\n\t\tNULL\n");
 	} else {
-		printf("\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
+		printf("\n\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
 		for (int i = 0; i < p_msg->param_cnt; i++)
 			printf("\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
 	}
@@ -252,14 +252,11 @@ char *dbg_trace_msg(struct msg *p_msg)
 	}
 	p = str;
 
-	sprintf(p, "\n\tmsg:\n");
-	p += strlen(p);
-
 	if (!p_msg) {
-		sprintf(p, "\t\tNULL\n");
+		sprintf(p, "\n\t\tNULL\n");
 		p += strlen(p);
 	} else {
-		sprintf(p, "\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
+		sprintf(p, "\n\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
 		p += strlen(p);
 		for (int i = 0; i < p_msg->param_cnt; i++) {
 			sprintf(p, "\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);

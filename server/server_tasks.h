@@ -26,6 +26,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include "game.h"
 
 /*
  ==============================================================================
@@ -36,19 +37,12 @@
 // input arguments count
 #define ARGC                         3
 
-// 2 clients can be approved
-#define MAX_PLAYERS                  2
-
 // allow 3 threads to be created
 #define MAX_CONNECTIONS              3
 #define THREAD_BITMAP_INIT_MASK      0xFFFFFFF8
 
 // standard input value
 #define PATH_STDIN                   "CONIN$"
-#define PATH_GAME_SESSION            "GameSession.txt"
-
-#define FILE_SHARE_ALL     (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
-#define GENERIC_READ_WRITE (GENERIC_READ | GENERIC_WRITE)
 
 /*
  ==============================================================================
@@ -56,52 +50,38 @@
  ==============================================================================
  */
 
-struct game
-{
-	int players_cnt;
-	bool accept_new_players;
-	HANDLE h_play_evt[2];
-	HANDLE h_game_mtx;
-};
-
-struct client
-{
+struct client {
 	int id;
 	int last_err;
 	int skt;
 	struct serv_env *p_env;
 	char *username;
 	char setup_numbers[5]; // FIXME:
-	char *opponent_username;
+	char *opp_username;
 	bool connected;
 	bool playing;
 	HANDLE *play_evt;
 	int op_pos;
 };
 
-struct serv_env
-{
+struct serv_env {
 	// server handling params
 	WSADATA	wsa_data;
 	int serv_skt;
 	char *serv_ip;
 	USHORT serv_port;
 	SOCKADDR_IN server;
-
 	// control params
 	HANDLE h_players_smpr;
 	HANDLE h_abort_evt;
 	HANDLE h_file_stdin;
 	OVERLAPPED olp_stdin;
 	char buffer[7]; // FIXME:
-
 	// clients
 	DWORD thread_bitmap;
 	struct client client[MAX_CONNECTIONS];
-	HANDLE h_clnt_thread[MAX_CONNECTIONS];
-
+	HANDLE h_client_thread[MAX_CONNECTIONS];
 	struct game game;
-
 	int last_err;
 };
 
@@ -217,17 +197,5 @@ int server_destroy_clients(struct serv_env *p_env);
  */
 int server_check_thread_status(struct serv_env *p_env, int ms);
 
-/**
- ******************************************************************************
- * @brief TODO:
- * @param p_clnt pointer to client object
- * @return E_SUCCESS on success
- ******************************************************************************
- */
-int game_session_start(struct client *p_clnt);
-int session_sequence(struct client *p_clnt, char *buffer);
-int game_session_end(struct client *p_clnt);
-int game_bulls(char *a, char *b);
-int game_cows(char *a, char *b);
 
 #endif // __SERVER_TASKS_H__

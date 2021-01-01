@@ -3,7 +3,7 @@
  * Bulls & Cows
  * client side
  *
- * client_tasks.h
+ * server_fsm.h
  * 
  * by: Chaim Gruda
  *     Nir Beiber
@@ -14,49 +14,26 @@
 
 /*
  ==============================================================================
- * INCLUDES
- ==============================================================================
- */
-
-/*
- ==============================================================================
- * DEFINES
- ==============================================================================
- */
-
-/*
- ==============================================================================
  * ENUMERATIONS
  ==============================================================================
  */
 
-enum state_clnt
-{
-	STATE_THREAD_EXIT,
-	STATE_CONNECT,
-	STATE_CONNECT_FAILURE,
-	STATE_CONNECT_SUCCESS,
-	STATE_CONNECT_DENIED,
-	STATE_ABORT_THREAD,
-	STATE_DISCONNECT,
-	STATE_CONNECT_APPROVE,
-	STATE_CONNECT_DENY,
-	STATE_MAIN_MENU,
-	STATE_THREAD_CLEANUP,
-	STATE_ASK_FOR_GAME,
-	STATE_GAME_INVITE,
-	STATE_NO_OPPONENTS,
-	STATE_PLAYER_MOVE,
-	STATE_OPONENT_QUIT,
-	STATE_MAX
+enum server_fsm {
+	SERVER_FSM_EXIT,
+	SERVER_FSM_CONNECT,
+	SERVER_FSM_ABORT,
+	SERVER_FSM_DISCONNECT,
+	SERVER_FSM_APPROVE,
+	SERVER_FSM_DENY,
+	SERVER_FSM_MENU,
+	SERVER_FSM_CLEANUP,
+	SERVER_FSM_GAME_REQ,
+	SERVER_FSM_INVITE,
+	SERVER_FSM_NO_OPP,
+	SERVER_FSM_PLAY_MOVE,
+	SERVER_FSM_OPP_QUIT,
+	SERVER_FSM_MAX
 };
-
-
-/*
- ==============================================================================
- * MACROS
- ==============================================================================
- */
 
 /*
  ==============================================================================
@@ -64,17 +41,18 @@ enum state_clnt
  ==============================================================================
  */
 
-int(*server_fsm[STATE_MAX])(struct client *p_clnt);
+int(*server_fsm[SERVER_FSM_MAX])(struct client *p_clnt);
 
 /**
  ******************************************************************************
- * @brief TODO:
- * @param 
- * @param 
- * @return 
+ * @brief thread for handling new TCP connections into server.
+ *        thread executs the server_fsm (finite state machine) which states
+ *        are defined in enum server_fsm
+ * @param param pointer to client struct
+ * @return returns last_err as recoreded in client struct
  ******************************************************************************
  */
-DWORD WINAPI clnt_thread(LPVOID param);
+DWORD WINAPI client_thread(LPVOID param);
 
 
 #endif // __SERVER_FSM_H__

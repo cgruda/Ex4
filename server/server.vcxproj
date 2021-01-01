@@ -142,6 +142,7 @@
   <ItemGroup>
     <ClCompile Include="..\common\message.c" />
     <ClCompile Include="..\common\tasks.c" />
+    <ClCompile Include="game.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="server_tasks.c" />
     <ClCompile Include="server_fsm.c" />
@@ -149,6 +150,7 @@
   <ItemGroup>
     <ClInclude Include="..\common\message.h" />
     <ClInclude Include="..\common\tasks.h" />
+    <ClInclude Include="game.h" />
     <ClInclude Include="server_tasks.h" />
     <ClInclude Include="server_fsm.h" />
   </ItemGroup>

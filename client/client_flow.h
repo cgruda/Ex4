@@ -25,18 +25,18 @@
  */
 
 // user interface strings
-#define UI_CONNECTED    "Connected to server on %s:%d\n"
-#define UI_CONNECT_FAIL "Failed connecting to server on %s:%d.\n"
-#define UI_CONNECT_DENY "Server on %s:%d denied the connection request\n"
-#define UI_GAME_START   "Game is on!\n"
-#define UI_GAME_CHOOSE  "Choose your 4 digits:\n"
-#define UI_GAME_GUESS   "Choose your guess:\n"
-#define UI_GAME_STAGE   "Bulls: %s\n" "Cows: %s\n" "%s played: %s\n"
-#define UI_GAME_WIN     "%s won!\n" "opponent number was %s\n"
-#define UI_GAME_DRAW    "It's a tie\n"
-#define UI_GAME_STOP    "Opponent quit\n"
-#define UI_MENU_CONNECT "Choose what to do next:\n" "1. Try to reconnect\n" "2. Exit\n"
-#define UI_MENU_PLAY    "Choose what to do next:\n" "1. Play against another client\n" "2. Quit\n"
+#define UI_CONNECTED    "\nConnected to server on %s:%d\n"
+#define UI_CONNECT_FAIL "\nFailed connecting to server on %s:%d.\n"
+#define UI_CONNECT_DENY "\nServer on %s:%d denied the connection request\n"
+#define UI_GAME_START   "\nGame is on!\n"
+#define UI_GAME_CHOOSE  "\nChoose your 4 digits:\n"
+#define UI_GAME_GUESS   "\nChoose your guess:\n"
+#define UI_GAME_STAGE   "\nBulls: %s\n" "Cows: %s\n" "%s played: %s\n"
+#define UI_GAME_WIN     "\n%s won!\n" "opponent number was %s\n"
+#define UI_GAME_DRAW    "\nIt's a tie\n"
+#define UI_GAME_STOP    "\nOpponent quit\n"
+#define UI_MENU_CONNECT "\nChoose what to do next:\n" "1. Try to reconnect\n" "2. Exit\n"
+#define UI_MENU_PLAY    "\nChoose what to do next:\n" "1. Play against another client\n" "2. Quit\n"
 
 /*
  ==============================================================================

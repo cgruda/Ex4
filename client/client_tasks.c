@@ -135,8 +135,15 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 
 	tv.tv_sec = timeout_sec;
 	res = recv_msg(p_p_msg, p_env->skt, &tv);
-	
+
+	// if ((*p_p_msg)->type == MSG_SERVER_GAME_RESULTS)
+	// 	DBG_TRACE_STR(C, p_env->username, "param_cnt=%d", (*p_p_msg)->param_cnt); // FIXME:
+
 	DBG_TRACE_MSG(C, p_env->username, *p_p_msg);
+
+	// if ((*p_p_msg)->type == MSG_SERVER_GAME_RESULTS)
+	// 	DBG_TRACE_STR(C, p_env->username, "dbg2"); // FIXME:
+
 
 	return res;
 }

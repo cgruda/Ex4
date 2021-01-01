@@ -354,6 +354,9 @@ int flow_clnt_game_play(struct client_env *p_env)
 		p_env->last_error = res;
 		return STATE_CONNECT_FAILURE;
 	}
+	
+	// if (p_msg->type == MSG_SERVER_GAME_RESULTS)
+	// 	DBG_TRACE_STR(C, p_env->username, "after rec"); // FIXME:
 
 	switch (p_msg->type) {
 	case MSG_SERVER_PLAYER_MOVE_REQUEST:
