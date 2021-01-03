@@ -542,7 +542,7 @@ int server_lock(struct serv_env *p_env)
 {
 	DWORD wait_code;
 
-	wait_code = WaitForSingleObject(p_env->h_client_approve_mtx, 5000);
+	wait_code = WaitForSingleObject(p_env->h_client_approve_mtx, SERVER_LOCK_WAIT_MS);
 	switch (wait_code) {
 	case WAIT_FAILED:
 		PRINT_ERROR(E_WINAPI);

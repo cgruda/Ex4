@@ -12,21 +12,18 @@
 #define _CRT_SECURE_NO_WARNINGS // FIXME:
 
 #pragma comment(lib, "ws2_32.lib")
-// include libraries
-
-
-#include "winsock2.h"
-#include <stdint.h>
-#include <stdio.h>
-#include "server_tasks.h"
-#include "tasks.h"
-
 
 /*
  ==============================================================================
  * INCLUDES
  ==============================================================================
  */
+
+#include "winsock2.h"
+#include <stdint.h>
+#include <stdio.h>
+#include "server_tasks.h"
+#include "tasks.h"
 
 /*
  ==============================================================================

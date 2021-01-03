@@ -43,6 +43,7 @@
 
 #define SERVER_TCP_WAIT_CONNECT_US   100000
 #define SERVER_WAIT_ON_THREAD_MS     2000
+#define SERVER_LOCK_WAIT_MS          5000
 
 // stdin path
 #define PATH_STDIN                   "CONIN$"
