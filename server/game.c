@@ -1,15 +1,18 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client side
+ * server program
  *
- * client_tasks.c
+ * game.c
+ * 
+ * game module handles game tasks, and communication
+ * between thread over the GameSession.txt file.
  * 
  * by: Chaim Gruda
  *     Nir Beiber
  */
 
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS // FIXME:
 
 /*
  ==============================================================================
@@ -151,6 +154,11 @@ int destroy_game(struct client *p_client)
 	p_client->playing = false;
 	p_client->opp_pos = 0;
 
+	/* remove opponent username */
+	if (p_client->opp_username)
+		free(p_client->opp_username);
+	p_client->opp_username = NULL;
+
 	return E_SUCCESS;
 }
 
@@ -170,6 +178,11 @@ int leave_game(struct client *p_client)
 	p_client->p_h_play_evt = NULL;
 	p_client->playing = false;
 	p_client->opp_pos = 0;
+
+	/* remove opponent username */
+	if (p_client->opp_username)
+		free(p_client->opp_username);
+	p_client->opp_username = NULL;
 
 	/* update game */
 	p_game->players_cnt--;
@@ -238,6 +251,25 @@ int game_session_start(struct client *p_client)
 
 	struct game *p_game = &p_client->p_env->game;
 	int res;
+	bool other_players_available = false;
+
+	/* check if there are more clients connected
+	 * if none - no need to start session. added
+	 * after reading question in forum specifiying
+	 * this scenario */
+	res = server_lock(p_client->p_env);
+	if (res != E_SUCCESS)
+		return res;
+	
+	if ((p_client->p_env->thread_bitmap & ~(THREAD_BITMAP_INIT_MASK | BIT(p_client->id))))
+		other_players_available = true;
+	
+	res = server_release(p_client->p_env);
+	if (res != E_SUCCESS)
+		return res;
+
+	if (!other_players_available)
+		return E_TIMEOUT;
 
 	/* aquaire game lock */
 	res = game_lock(p_game);
@@ -251,7 +283,11 @@ int game_session_start(struct client *p_client)
 		else
 			res = join_game(p_client);
 	} else {
-		res = E_FAILURE;
+		/* this may occur when player disconnected but
+		 * second player still didnt call session_end,
+		 * act as if the are no opponents since this
+		 * case was not defined */
+		res = E_TIMEOUT;
 	}
 
 	/* release game lock */
@@ -413,6 +449,16 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 
 	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "LOCK");
 
+	/* early indication that opponent quit */
+	if (p_client->playing      &&
+	    p_client->opp_username &&
+	    p_game->players_cnt != GAME_MAX_PLAYERS) {
+		res = game_release(p_game);
+		if (res != E_SUCCESS)
+			return res;
+		return E_TIMEOUT;
+	}
+
 	/* check if opponent wrote data */
 	wait_code = WaitForSingleObject(*h_evt, 0);
 	switch (wait_code) {
@@ -432,7 +478,7 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 		if (res != E_SUCCESS)
 			break;
 		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "RELEASE");
-		wait_code = WaitForSingleObject(*h_evt, 25000); // FIXME:
+		wait_code = WaitForSingleObject(*h_evt, GAME_OPP_WAIT_TIME_MS);
 		if (wait_code == WAIT_TIMEOUT) {
 			res = E_TIMEOUT;
 			break;

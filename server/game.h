@@ -1,9 +1,12 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * server side
+ * server program
  *
- * client_tasks.h
+ * game.h
+ * 
+ * game module handles game tasks, and communication
+ * between thread over the GameSession.txt file.
  * 
  * by: Chaim Gruda
  *     Nir Beiber
@@ -28,6 +31,7 @@
  */
 
 #define GAME_MAX_PLAYERS              2
+#define GAME_OPP_WAIT_TIME_MS         29000 // FIXME:
 #define PATH_GAME_SESSION            "GameSession.txt"
 
 /*

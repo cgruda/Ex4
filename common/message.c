@@ -24,7 +24,7 @@
  ==============================================================================
  */
 
-#define _CRT_SECURE_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS // FIXME:
 #pragma comment(lib, "ws2_32.lib")
 
 /*
@@ -84,7 +84,8 @@ int msg_buff_len(struct msg *p_msg)
 			buff_len += strlen(p_msg->param_lst[i]);
 	}
 
-	return buff_len;
+	/* add 1 for newly requested '\n' at message end */
+	return buff_len + 1;
 }
 
 int msg_2_buff(char *buff, struct msg *p_msg)
@@ -104,6 +105,9 @@ int msg_2_buff(char *buff, struct msg *p_msg)
 		offset += strlen(str);
 	}
 
+	/* as instructed in forum */
+	buff[offset++] = '\n';
+
 	return offset;
 }
 
@@ -119,8 +123,10 @@ int new_msg_param(char **p_param_dst, char *param_src)
 	/* allocate param mem */
 	int mem_size = strlen(param_src) + 1;
 	*p_param_dst = calloc(mem_size, sizeof(char));
-	if (!*p_param_dst)
+	if (!*p_param_dst) {
+		PRINT_ERROR(E_STDLIB);
 		return E_STDLIB;
+	}
 
 	/* fill param */
 	memcpy(*p_param_dst, param_src, mem_size - 1);
@@ -139,12 +145,14 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 
 	/* allocate mem */
 	p_msg = calloc(1, sizeof(*p_msg));
-	if (!p_msg)
+	if (!p_msg) {
+		PRINT_ERROR(E_STDLIB);
 		return E_STDLIB;
+	}
 
 	/* parse message type */
 	p_msg->type = MSG_INVALID;
-	token = strtok_s(buff, ":", &context);
+	token = strtok_s(buff, ":\n", &context);
 	for (int i = MSG_MIN; i < MSG_MAX; i++) {
 		if (strcmp(token, msg_type_2_str[i]) == 0) {
 			p_msg->type = i;
@@ -155,14 +163,16 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 	/* corrupt message */
 	if (p_msg->type == MSG_INVALID) {
 		free_msg(&p_msg);
+		PRINT_ERROR(E_MESSAGE);
 		return E_MESSAGE;
 	}
 
 	/* parse params */
-	while(token = strtok_s(NULL, ";", &context)) {
+	while(token = strtok_s(NULL, ";\n", &context)) {
 		idx = p_msg->param_cnt;
 		if (idx >= MSG_MAX_PARAMS) {
 			free_msg(&p_msg);
+			PRINT_ERROR(E_MESSAGE);
 			return E_MESSAGE;
 		}
 		res = new_msg_param(&p_msg->param_lst[idx], token);
@@ -246,7 +256,8 @@ int send_msg(int skt, struct msg **p_p_msg)
 		/* allocate send buffer */
 		buff_len = msg_buff_len(p_msg);
 		buffer = calloc(buff_len + 1, sizeof(*buffer));
-		if (buffer == NULL) {
+		if (!buffer) {
+			PRINT_ERROR(E_STDLIB);
 			ret_val = E_STDLIB;
 			break;
 		}

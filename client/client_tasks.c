@@ -23,7 +23,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include "client_tasks.h"
-#include "client_flow.h"
+#include "client_fsm.h"
 #include "message.h"
 #include "tasks.h"
 
@@ -92,8 +92,8 @@ int client_init(struct client_env *p_env)
 	res = WSAStartup(MAKEWORD(2, 2), &wsa_data);
 	if (res) {
 		printf("Error: WSAStartup returnd with code 0x%X\n", res);
-		p_env->last_error = E_WINSOCK;
-		return STATE_EXIT;
+		p_env->last_err = E_WINSOCK;
+		return CLIENT_FSM_EXIT;
 	}
 
 	/* set server address */
@@ -102,10 +102,10 @@ int client_init(struct client_env *p_env)
 	p_env->server.sin_addr.s_addr = inet_addr(p_env->server_ip);
 	p_env->server.sin_port        = htons(p_env->server_port);
 
-	return STATE_CONNECT_ATTEMPT;
+	return CLIENT_FSM_CONNECT;
 }
 
-int cilent_send_msg(struct client_env *p_env, int type, char *param)
+int client_send_msg(struct client_env *p_env, int type, char *param)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
@@ -119,7 +119,7 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param)
 	/* send message */
 	res = send_msg(p_env->skt, &p_msg);
 
-	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, p_msg);
+	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, p_msg); // FIXME:
 
 	/* free message */
 	free_msg(&p_msg);
@@ -136,23 +136,16 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 	tv.tv_sec = timeout_sec;
 	res = recv_msg(p_p_msg, p_env->skt, &tv);
 
-	// if ((*p_p_msg)->type == MSG_SERVER_GAME_RESULTS)
-	// 	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "param_cnt=%d", (*p_p_msg)->param_cnt); // FIXME:
-
 	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, *p_p_msg);
-
-	// if ((*p_p_msg)->type == MSG_SERVER_GAME_RESULTS)
-	// 	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "dbg2"); // FIXME:
-
 
 	return res;
 }
 
-
 int client_cleanup(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	int ret_val = p_env->last_error;
+
+	int ret_val = p_env->last_err;
 
 	if (WSACleanup()) {
 		PRINT_ERROR(E_WINSOCK);
@@ -160,4 +153,19 @@ int client_cleanup(struct client_env *p_env)
 	}
 
 	return ret_val;
+}
+
+bool client_game_input_get(char *buff)
+{
+	scanf_s(" %s", buff, 5);
+
+	if (strlen(buff) < 4)
+		return false;
+
+	for (int i = 0; i < 4; i++)
+		for (int j = i + 1; j < 4; j++)
+			if ((buff[i] == buff[j]) || buff[i] < '0' || buff[i] > '9')
+				return false;
+
+	return true;
 }

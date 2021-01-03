@@ -83,10 +83,10 @@ enum err_val {
 // print error message
 #define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
 
-#define BIT(pos) (1 << pos)
-#define SET_BIT(map, pos) (map |= BIT(pos))
-#define CLR_BIT(map, pos) (map &= ~BIT(pos))
-#define TEST_BIT(map, pos) (!!(map & BIT(pos)))
+#define BIT(pos) (1 << (pos))
+#define SET_BIT(map, pos) ((map) |= BIT(pos))
+#define CLR_BIT(map, pos) ((map) &= ~BIT(pos))
+#define TEST_BIT(map, pos) (!!((map) & BIT(pos)))
 
 /*
  ==============================================================================

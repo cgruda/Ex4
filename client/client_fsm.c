@@ -11,8 +11,8 @@
  * states is done using an array of funtions, where functions
  * are indexed by their states, as defined in enum state_clnt.
  *
- * the first state in the FSM is: STATE_CONNECT_ATTEMPT
- * the last state in the FSM is: STATE_EXIT
+ * the first state in the FSM is: CLIENT_FSM_CONNECT
+ * the last state in the FSM is: CLIENT_FSM_EXIT
  *
  * in some cases a state will directly call a differet function,
  * without changing the actual state. this is valid operation.
@@ -20,6 +20,7 @@
  * by: Chaim Gruda
  *     Nir Beiber
  */
+
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -33,7 +34,7 @@
 #include <stdbool.h>
 #include <assert.h>
 #include "client_tasks.h"
-#include "client_flow.h"
+#include "client_fsm.h"
 #include "tasks.h"
 #include "message.h"
 
@@ -43,7 +44,7 @@
  ==============================================================================
  */
 
-int flow_clnt_connect_attempt(struct client_env *p_env)
+int client_fsm_connect(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(!p_env->approved);
@@ -54,51 +55,52 @@ int flow_clnt_connect_attempt(struct client_env *p_env)
 	p_env->skt = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (p_env->skt == INVALID_SOCKET) {
 		PRINT_ERROR(E_WINSOCK);
-		p_env->last_error = E_WINSOCK;
-		return STATE_EXIT;
+		p_env->last_err = E_WINSOCK;
+		return CLIENT_FSM_EXIT;
 	}
 
 	/* connect socket with server - TCP connection */
 	res = connect(p_env->skt, (PSOCKADDR)&p_env->server, sizeof(SOCKADDR));
 	if(res == SOCKET_ERROR) {
-		p_env->last_error = E_WINSOCK;
-		return STATE_CONNECT_FAILURE;
+		if (WSAGetLastError() != WSAECONNREFUSED) {
+			PRINT_ERROR(E_WINSOCK);
+			p_env->last_err = E_WINSOCK;
+		}
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
 	/* go to send client request */
-	return STATE_CLIENT_REQUEST;
+	return CLIENT_FSM_REQUEST;
 }
 
-int flow_clnt_disconnect(struct client_env *p_env)
+int client_fsm_disconnect(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	assert(p_env->approved);
 
-	/* send disconncet message. if error occures there
-	 * is nothing to be done, i.e we exit anyway. so no
-	 * purpose in getting or cheking result. error print
-	 * will be called from within call */
-	cilent_send_msg(p_env, MSG_CLIENT_DISCONNECT, NULL);
+	/* send disconncet message, return value does not matter
+	 * since we are on way out anyway. arror messages will
+	 * be printed from within call */
+	client_send_msg(p_env, MSG_CLIENT_DISCONNECT, NULL);
 
 	/* change approval state */
 	p_env->approved = false;
 
-	return STATE_EXIT;
+	return CLIENT_FSM_EXIT;
 }
 
-int flow_clnt_connect_failure(struct client_env *p_env)
+int client_fsm_connect_fail(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int res;
 
-	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "Error: %d", p_env->last_error);
+	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "Error: %d", p_env->last_err);
 
 	/* send disconnect if was approved. result
 	 * does not matter since we are in an error
 	 * flow in any case. error messages will be
 	 * printed from whithin call */
 	if (p_env->approved)
-		flow_clnt_disconnect(p_env);
+		client_fsm_disconnect(p_env);
 
 	/* print failure message */
 	UI_PRINT(UI_CONNECT_FAIL, p_env->server_ip, p_env->server_port);
@@ -107,15 +109,15 @@ int flow_clnt_connect_failure(struct client_env *p_env)
 	res = closesocket(p_env->skt);
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
-		p_env->last_error = E_WINSOCK;
-		return STATE_EXIT;
+		p_env->last_err = E_WINSOCK;
+		return CLIENT_FSM_EXIT;
 	}
 
 	/* go to reconnect menu */
-	return STATE_RECONNECT_MENU;
+	return CLIENT_FSM_RECONNECT;
 }
 
-flow_clnt_reconnect_menu(struct client_env *p_env)
+client_fsm_reconnect(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int choice;
@@ -127,47 +129,47 @@ flow_clnt_reconnect_menu(struct client_env *p_env)
 	/* parse choice */
 	switch (choice) {
 	case CHOICE_RECONNECT:
-		return STATE_CONNECT_ATTEMPT;
+		return CLIENT_FSM_CONNECT;
 	case CHOICE_EXIT:
-		return STATE_EXIT;
+		return CLIENT_FSM_EXIT;
 	default:
-		PRINT_ERROR(E_INPUT);
-		p_env->last_error = E_INPUT;
-		return STATE_EXIT;
+		print_error(E_INPUT);
+		p_env->last_err = E_INPUT;
+		return CLIENT_FSM_EXIT;
 	}
 }
 
-int flow_clnt_client_request(struct client_env *p_env)
+int client_fsm_request(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
 	/* send client request */
-	res = cilent_send_msg(p_env, MSG_CLIENT_REQUEST, p_env->username);
+	res = client_send_msg(p_env, MSG_CLIENT_REQUEST, p_env->username);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 	
 	/* recieve server answer */
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
 	/* interpet server response */
 	switch (p_msg->type) {
 	case MSG_SERVER_APPROVED:
-		next_state = STATE_CONNECT_APPROVED;
+		next_state = CLIENT_FSM_APPROVED;
 		break;
 	case MSG_SERVER_DENIED:
-		next_state = STATE_CONNECT_DENIED;
+		next_state = CLIENT_FSM_DENIED;
 		break;
 	default:
-		p_env->last_error = E_FLOW;
-		next_state = STATE_UNDEFINED_FLOW;
+		p_env->last_err = E_FLOW;
+		next_state = CLIENT_FSM_UNDEFINED;
 	}
 
 	/* free recieved message */
@@ -176,7 +178,7 @@ int flow_clnt_client_request(struct client_env *p_env)
 	return next_state;
 }
 
-int flow_clnt_connect_denied(struct client_env *p_env)
+int client_fsm_denied(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(!p_env->approved);
@@ -185,10 +187,10 @@ int flow_clnt_connect_denied(struct client_env *p_env)
 	UI_PRINT(UI_CONNECT_DENY, p_env->server_ip, p_env->server_port);
 
 	/* go to reconnect menu */
-	return STATE_RECONNECT_MENU;
+	return CLIENT_FSM_RECONNECT;
 }
 
-int flow_clnt_connect_approved(struct client_env *p_env)
+int client_fsm_approved(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(!p_env->approved);
@@ -200,10 +202,10 @@ int flow_clnt_connect_approved(struct client_env *p_env)
 	UI_PRINT(UI_CONNECTED, p_env->server_ip, p_env->server_port);
 
 	/* go to next state */
-	return STATE_MAIN_MENU;
+	return CLIENT_FSM_MAIN_MENU;
 }
 
-int flow_clnt_main_menu(struct client_env *p_env)
+int client_fsm_main_menu(struct client_env *p_env)
 {	
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(p_env->approved);
@@ -213,14 +215,14 @@ int flow_clnt_main_menu(struct client_env *p_env)
 	/* await main menu message */
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
 	/* interpet server message */
 	if  (p_msg->type != MSG_SERVER_MAIN_MENU) {
 		free_msg(&p_msg);	
-		return STATE_UNDEFINED_FLOW;
+		return CLIENT_FSM_UNDEFINED;
 	}
 
 	/* free resource */
@@ -234,62 +236,56 @@ int flow_clnt_main_menu(struct client_env *p_env)
 	switch (choice)
 	{
 	case CHOICE_PLAY:
-		return STATE_ASK_FOR_GAME;
+		return CLIENT_FSM_GAME_REQ;
 	case CHOICE_QUIT:
-		return STATE_DISCONNECT;
+		return CLIENT_FSM_DISCONNECT;
 	default:
-		PRINT_ERROR(E_INPUT);
-		p_env->last_error = E_INPUT;
-		return STATE_DISCONNECT;
+		print_error(E_INPUT);
+		p_env->last_err = E_INPUT;
+		return CLIENT_FSM_DISCONNECT;
 	}
 }
 
-int flow_clnt_invite_and_setup(struct client_env *p_env)
+int client_fsm_invite_setup(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
-	int number;
-	char buff[5] = {0};
+	char buff[UI_INPUT_LEN] = {0};
 	int res;
 	
 	UI_PRINT(UI_GAME_START);
 
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
 	if (p_msg->type != MSG_SERVER_SETUP_REQUEST) {
 		free_msg(&p_msg);
-		return STATE_UNDEFINED_FLOW;
+		return CLIENT_FSM_UNDEFINED;
 	}
 
 	free_msg(&p_msg);
 
 	UI_PRINT(UI_GAME_CHOOSE);
-	UI_GET(&number);
 
-	// TODO: check valid input
-	if (number > 9999 || number < 0) {
-		PRINT_ERROR(E_INPUT);
-		p_env->last_error = E_INPUT;
-		return STATE_DISCONNECT;
+	if (!client_game_input_get(buff)) {
+		print_error(E_INPUT);
+		p_env->last_err = E_INPUT;
+		return CLIENT_FSM_DISCONNECT;
 	}
 
-	sprintf_s(buff, 5, "%d", number); // FIXME:
-
-	res = cilent_send_msg(p_env, MSG_CLIENT_SETUP, buff);
+	res = client_send_msg(p_env, MSG_CLIENT_SETUP, buff);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
-	return STATE_GAME_PLAY;
+	return CLIENT_FSM_GAME_MOVE;
 }
 
-
-int flow_clnt_ask_for_game(struct client_env *p_env)
+int client_fsm_game_req(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	assert(p_env->approved);
@@ -297,27 +293,27 @@ int flow_clnt_ask_for_game(struct client_env *p_env)
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
-	res = cilent_send_msg(p_env, MSG_CLIENT_VERSUS, NULL);
+	res = client_send_msg(p_env, MSG_CLIENT_VERSUS, NULL);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_MAX);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
 	switch (p_msg->type) {
 	case MSG_SERVER_NO_OPONENTS:
-		next_state = STATE_MAIN_MENU;
+		next_state = CLIENT_FSM_MAIN_MENU;
 		break;
 	case MSG_SERVER_INVITE:
-		next_state = STATE_INVITE_AND_SETUP;
+		next_state = CLIENT_FSM_INVITE_SETUP;
 		break;
 	default:
-		next_state = STATE_UNDEFINED_FLOW;
+		next_state = CLIENT_FSM_UNDEFINED;
 		break;
 	}
 
@@ -326,81 +322,70 @@ int flow_clnt_ask_for_game(struct client_env *p_env)
 	return next_state;
 }
 
-int flow_clnt_undefined_flow(struct client_env *p_env)
+int client_fsm_undefined(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	PRINT_ERROR(E_FLOW);
 	
 	/* handle accorsing to approval state */
 	if (p_env->approved)
-		return STATE_DISCONNECT;
+		return CLIENT_FSM_DISCONNECT;
 	else
-		return STATE_EXIT;
+		return CLIENT_FSM_EXIT;
 }
 
-
-
-
-int flow_clnt_game_play(struct client_env *p_env)
+int client_fsm_game_move(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
-	int number;
-	char buff[5] = {0};
+	char buff[UI_INPUT_LEN] = {0};
 
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMOUT_SEC_HUMAN_MAX);
 	if (res != E_SUCCESS) {
-		p_env->last_error = res;
-		return STATE_CONNECT_FAILURE;
+		p_env->last_err = res;
+		return CLIENT_FSM_CONNECT_FAIL;
 	}
-	
-	// if (p_msg->type == MSG_SERVER_GAME_RESULTS)
-	// 	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "after rec"); // FIXME:
 
 	switch (p_msg->type) {
 	case MSG_SERVER_PLAYER_MOVE_REQUEST:
 		UI_PRINT(UI_GAME_GUESS);
-		UI_GET(&number);
 
-		// TODO: check valid input
-		if (number > 9999 || number < 0) {
-			PRINT_ERROR(E_INPUT);
-			p_env->last_error = E_INPUT;
-			next_state = STATE_DISCONNECT;
+		if (!client_game_input_get(buff)) {
+			print_error(E_INPUT);
+			p_env->last_err = E_INPUT;
+			next_state = CLIENT_FSM_DISCONNECT;
 			break;
 		}
 
-		sprintf_s(buff, 5, "%d", number); // FIXME:
-
-		res = cilent_send_msg(p_env, MSG_CLIENT_PLAYER_MOVE, buff);
+		res = client_send_msg(p_env, MSG_CLIENT_PLAYER_MOVE, buff);
 		if (res != E_SUCCESS) {
-			p_env->last_error = res;
-			next_state = STATE_DISCONNECT;
+			p_env->last_err = res;
+			next_state = CLIENT_FSM_DISCONNECT;
 			break;
 		}
 
-		next_state = STATE_GAME_PLAY;
+		next_state = CLIENT_FSM_GAME_MOVE;
 		break;
 	case MSG_SERVER_GAME_RESULTS:
 		UI_PRINT(UI_GAME_STAGE, p_msg->param_lst[0], p_msg->param_lst[1],
 					p_msg->param_lst[2], p_msg->param_lst[3]);
-		next_state = STATE_GAME_PLAY;
+		next_state = CLIENT_FSM_GAME_MOVE;
 		break;
 	case MSG_SERVER_WIN:
 		UI_PRINT(UI_GAME_WIN, p_msg->param_lst[0], p_msg->param_lst[1]);
-		next_state = STATE_MAIN_MENU;
+		next_state = CLIENT_FSM_MAIN_MENU;
 		break;
 	case MSG_SERVER_DRAW:
 		UI_PRINT(UI_GAME_DRAW);
-		next_state = STATE_MAIN_MENU;
+		next_state = CLIENT_FSM_MAIN_MENU;
 		break;
 	case MSG_SERVER_OPPONENT_QUIT:
 		UI_PRINT(UI_GAME_STOP);
-		next_state = STATE_MAIN_MENU;
+		next_state = CLIENT_FSM_MAIN_MENU;
 		break;
 	default:
-		next_state = STATE_UNDEFINED_FLOW;
+		next_state = CLIENT_FSM_UNDEFINED;
 		break;
 	}
 
@@ -409,22 +394,18 @@ int flow_clnt_game_play(struct client_env *p_env)
 	return next_state;
 }
 
-
-
-
-// flow functions
-int(*clnt_flow[STATE_MAX])(struct client_env *p_env) =
-{
-	[STATE_CONNECT_ATTEMPT]  = flow_clnt_connect_attempt,
-	[STATE_CONNECT_FAILURE]  = flow_clnt_connect_failure,
-	[STATE_CONNECT_APPROVED] = flow_clnt_connect_approved,
-	[STATE_CONNECT_DENIED]   = flow_clnt_connect_denied,
-	[STATE_UNDEFINED_FLOW]   = flow_clnt_undefined_flow,
-	[STATE_DISCONNECT]       = flow_clnt_disconnect,
-	[STATE_MAIN_MENU]        = flow_clnt_main_menu,
-	[STATE_CLIENT_REQUEST]   = flow_clnt_client_request,
-	[STATE_RECONNECT_MENU]   = flow_clnt_reconnect_menu,
-	[STATE_ASK_FOR_GAME]     = flow_clnt_ask_for_game,
-	[STATE_INVITE_AND_SETUP] = flow_clnt_invite_and_setup,
-	[STATE_GAME_PLAY]        = flow_clnt_game_play,
+// client finite state machine functions array defenition
+int(*clnt_flow[CLIENT_FSM_MAX])(struct client_env *p_env) = {
+	[CLIENT_FSM_CONNECT]      = client_fsm_connect,
+	[CLIENT_FSM_CONNECT_FAIL] = client_fsm_connect_fail,
+	[CLIENT_FSM_APPROVED]     = client_fsm_approved,
+	[CLIENT_FSM_DENIED]       = client_fsm_denied,
+	[CLIENT_FSM_UNDEFINED]    = client_fsm_undefined,
+	[CLIENT_FSM_DISCONNECT]   = client_fsm_disconnect,
+	[CLIENT_FSM_MAIN_MENU]    = client_fsm_main_menu,
+	[CLIENT_FSM_REQUEST]      = client_fsm_request,
+	[CLIENT_FSM_RECONNECT]    = client_fsm_reconnect,
+	[CLIENT_FSM_GAME_REQ]     = client_fsm_game_req,
+	[CLIENT_FSM_INVITE_SETUP] = client_fsm_invite_setup,
+	[CLIENT_FSM_GAME_MOVE]    = client_fsm_game_move,
 };

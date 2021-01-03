@@ -14,12 +14,6 @@
 
 /*
  ==============================================================================
- * INCLUDES
- ==============================================================================
- */
-
-/*
- ==============================================================================
  * DEFINES
  ==============================================================================
  */
@@ -38,32 +32,32 @@
 #define UI_MENU_CONNECT "\nChoose what to do next:\n" "1. Try to reconnect\n" "2. Exit\n"
 #define UI_MENU_PLAY    "\nChoose what to do next:\n" "1. Play against another client\n" "2. Quit\n"
 
+#define UI_INPUT_LEN    6
+
 /*
  ==============================================================================
  * ENUMERATIONS
  ==============================================================================
  */
 
-enum state_clnt
-{
-	STATE_EXIT,
-	STATE_CONNECT_ATTEMPT,
-	STATE_CONNECT_FAILURE,
-	STATE_CONNECT_APPROVED,
-	STATE_CONNECT_DENIED,
-	STATE_DISCONNECT,
-	STATE_UNDEFINED_FLOW,
-	STATE_MAIN_MENU,
-	STATE_RECONNECT_MENU,
-	STATE_CLIENT_REQUEST,
-	STATE_ASK_FOR_GAME,
-	STATE_INVITE_AND_SETUP,
-	STATE_GAME_PLAY,
-	STATE_MAX
+enum state_clnt {
+	CLIENT_FSM_EXIT,
+	CLIENT_FSM_CONNECT,
+	CLIENT_FSM_CONNECT_FAIL,
+	CLIENT_FSM_APPROVED,
+	CLIENT_FSM_DENIED,
+	CLIENT_FSM_DISCONNECT,
+	CLIENT_FSM_UNDEFINED,
+	CLIENT_FSM_MAIN_MENU,
+	CLIENT_FSM_RECONNECT,
+	CLIENT_FSM_REQUEST,
+	CLIENT_FSM_GAME_REQ,
+	CLIENT_FSM_INVITE_SETUP,
+	CLIENT_FSM_GAME_MOVE,
+	CLIENT_FSM_MAX
 };
 
-enum user_choice
-{
+enum user_choice {
 	CHOICE_INVALID,
 	/* connect menu */
 	CHOICE_RECONNECT = 1,
@@ -88,18 +82,8 @@ enum user_choice
  ==============================================================================
  */
 
-int(*clnt_flow[STATE_MAX])(struct client_env *p_env);
-
-/**
- ******************************************************************************
- * @brief 
- * @param 
- * @param 
- * @return 
- ******************************************************************************
- */
-int flow_clnt_connect_attempt(struct client_env *p_env);
-int flow_clnt_connect_failure(struct client_env *p_env);
+// client finite state machine functions array declaration
+int(*clnt_flow[CLIENT_FSM_MAX])(struct client_env *p_env);
 
 
 #endif // __CLIENT_FLOW_H__

@@ -43,7 +43,7 @@ struct client_env {
 	char *username;
 	bool approved;
 	SOCKADDR_IN server;
-	int last_error;
+	int last_err;
 };
 
 /*
@@ -67,7 +67,7 @@ int check_input(struct client_env *p_env, int argc, char** argv);
  ******************************************************************************
  * @brief initialize client resources
  * @param p_env pointer to env
- * @return STATE_EXIT on failure, STATE_CONNECT_ATTEMPT on success
+ * @return CLIENT_FSM_EXIT on failure, CLIENT_FSM_CONNECT on success
  ******************************************************************************
  */
 int client_init(struct client_env *p_env);
@@ -93,7 +93,7 @@ int client_cleanup(struct client_env *p_env);
  *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int cilent_send_msg(struct client_env *p_env, int type, char *param);
+int client_send_msg(struct client_env *p_env, int type, char *param);
 
 /**
  ******************************************************************************
@@ -109,6 +109,15 @@ int cilent_send_msg(struct client_env *p_env, int type, char *param);
  ******************************************************************************
  */
 int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec);
+
+/**
+ ******************************************************************************
+ * @brief get game input from player
+ * @param buff pointer to buffer to store input
+ * @return true if input is valid
+ ******************************************************************************
+ */
+bool client_game_input_get(char *buff);
 
 
 #endif // __CLIENT_TASKS_H__

@@ -17,7 +17,7 @@
 
 #include <stdio.h>
 #include "client_tasks.h"
-#include "client_flow.h"
+#include "client_fsm.h"
 #include "tasks.h"
 
 /*
@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 	state = client_init(&env);
 
 	/* client execution loop */
-	while (state != STATE_EXIT)
+	while (state != CLIENT_FSM_EXIT)
 		state = (*clnt_flow[state])(&env);
 
 	/* free client resources */

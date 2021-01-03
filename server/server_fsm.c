@@ -47,8 +47,12 @@ DWORD WINAPI client_thread(LPVOID param)
 	while (state != SERVER_FSM_EXIT) {
 
 		/* check for abort signal from main thread */
-		if (server_check_abort(p_env))
-			state = SERVER_FSM_ABORT;
+		if ((state != SERVER_FSM_ABORT)      &&
+		    (state != SERVER_FSM_EXIT)       &&
+		    (state != SERVER_FSM_DISCONNECT) &&
+		    (state != SERVER_FSM_CLEANUP))
+			if (server_check_abort(p_env))
+				state = SERVER_FSM_ABORT;
 
 		/* preform state and get next state */
 		state = (*server_fsm[state])(p_client);
@@ -104,9 +108,6 @@ int server_fsm_cleanup(struct client *p_client)
 		DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 		free(p_client->username);
 	}
-
-	if (p_client->opp_username)
-		free(p_client->opp_username);
 
 	/* close threads socket */
 	if (closesocket(p_client->skt) == SOCKET_ERROR) {
@@ -170,7 +171,12 @@ int server_fsm_game_request(struct client *p_client)
 
 	/* start/join a game */
 	res = game_session_start(p_client);
-	if (res != E_SUCCESS) {
+	switch(res) {
+	case E_SUCCESS:
+		break;
+	case E_TIMEOUT:
+		return SERVER_FSM_NO_OPP;
+	default:
 		p_client->last_err = res;
 		return SERVER_FSM_ABORT;
 	}

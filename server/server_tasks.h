@@ -1,9 +1,15 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * server side
+ * server program
  *
- * client_tasks.h
+ * server_tasks.h
+ * 
+ * server_tasks module handles all tasks that are not
+ * part of the threads FSM and the game itself.
+ * this includs wrappers for the message module,
+ * controling creation and closing of threads from main thread,
+ * and server intilization and cleanup.
  * 
  * by: Chaim Gruda
  *     Nir Beiber
@@ -35,8 +41,14 @@
 #define MAX_CONNECTIONS              3
 #define THREAD_BITMAP_INIT_MASK      0xFFFFFFF8
 
+#define SERVER_TCP_WAIT_CONNECT_US   100000
+#define SERVER_WAIT_ON_THREAD_MS     2000
+
 // stdin path
 #define PATH_STDIN                   "CONIN$"
+
+#define SERVER_EXIT_COMMAND          "exit"
+#define SERVER_EXIT_COMMAND_LEN      (4 + 1)
 
 /*
  ==============================================================================
@@ -45,6 +57,7 @@
  */
 
 struct client {
+	int id;
 	int skt;
 	bool connected;
 	bool playing;
@@ -64,6 +77,7 @@ struct serv_env {
 	USHORT server_port;
 	SOCKADDR_IN server;
 	HANDLE h_client_approve_smpr;
+	HANDLE h_client_approve_mtx;
 	HANDLE h_abort_evt;
 	HANDLE h_stdin;
 	OVERLAPPED olp_stdin;
@@ -186,6 +200,24 @@ int server_destroy_clients(struct serv_env *p_env);
  ******************************************************************************
  */
 int server_check_thread_status(struct serv_env *p_env, int ms);
+
+/**
+ ******************************************************************************
+ * @brief lock server-thread bitmap
+ * @param p_env pointer to server enviroment
+ * @return E_SUCCESS on success
+ ******************************************************************************
+ */
+int server_lock(struct serv_env *p_env);
+
+/**
+ ******************************************************************************
+ * @brief release server-thread bitmap
+ * @param p_env pointer to server enviroment
+ * @return E_SUCCESS on success
+ ******************************************************************************
+ */
+int server_release(struct serv_env *p_env);
 
 
 #endif // __SERVER_TASKS_H__

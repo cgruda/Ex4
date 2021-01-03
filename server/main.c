@@ -49,18 +49,23 @@ int main(int argc, char **argv)
 
 	if (ret_val == E_SUCCESS) {
 
+		/* execution loop */
 		while (1) {
 			
+			/* TCP connection entrance */
 			if(serv_clnt_connect(&env) != E_SUCCESS)
 				break;
-			
+
+			/* check if any TCP connections ended */
 			if (server_check_thread_status(&env, 0) != E_SUCCESS)
 				break;
 
+			/* check ig "exit" command given */
 			if (server_quit(&env))
 				break;
 		}
 
+		/* make sure all threads end nicely */
 		env.last_err = server_destroy_clients(&env);
 	}
 	

@@ -1,13 +1,20 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client side
+ * server program
  *
- * client_tasks.c
+ * server_tasks.c
+ * 
+ * server_tasks module handles all tasks that are not
+ * part of the threads FSM and the game itself.
+ * this includs wrappers for the message module,
+ * controling creation and closing of threads from main thread,
+ * and server intilization and cleanup.
  * 
  * by: Chaim Gruda
  *     Nir Beiber
  */
+
 #define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
 #define _CRT_SECURE_NO_WARNINGS		// FIXME:
 
@@ -155,14 +162,21 @@ int serv_ctrl_init(struct serv_env *p_env)
 {
 	/* semaphore to restrict max players */
 	p_env->h_client_approve_smpr = CreateSemaphore(NULL, GAME_MAX_PLAYERS, GAME_MAX_PLAYERS, NULL);
-	if (p_env->h_client_approve_smpr == NULL) {
+	if (!p_env->h_client_approve_smpr) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
 
 	/* event for signal threads to abort */
 	p_env->h_abort_evt = CreateEvent(NULL, TRUE, FALSE, NULL);
-	if (p_env->h_abort_evt == NULL) {
+	if (!p_env->h_abort_evt) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	/* mutex to access server-thread bitmap */
+	p_env->h_client_approve_mtx = CreateMutex(NULL, FALSE, NULL);
+	if (!p_env->h_client_approve_mtx) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
@@ -225,18 +239,18 @@ bool server_quit(struct serv_env *p_env)
 
 	/* if command is NOT "exit" - reset read event
 	 * and start a new asynchronous read. else */
-	if (strncmp(p_env->buffer, "exit", 5)) { // FIXME: exitXXX...
+	if (strncmp(p_env->buffer, SERVER_EXIT_COMMAND, SERVER_EXIT_COMMAND_LEN)) { // FIXME: exitXXX...
 		if (!ResetEvent(p_env->olp_stdin.hEvent)) {
 			PRINT_ERROR(E_WINAPI);
 			p_env->last_err = E_WINAPI;
 			return true;
 		}
 		/* read stdin asynchronously for exit command.
-	 	 * asynchronous read must always return false.
-	 	 * error is detected by checking WSA last error.
-	 	 * io_pending designates i/o pending completion,
-	 	 * and is thus not treated as an error. */
-		res = ReadFile(p_env->h_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
+		 * asynchronous read must always return false.
+		 * error is detected by checking WSA last error.
+		 * io_pending designates i/o pending completion,
+		 * and is thus not treated as an error. */
+		res = ReadFile(p_env->h_stdin, p_env->buffer, SERVER_EXIT_COMMAND_LEN - 1, NULL, &p_env->olp_stdin);
 		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
 			PRINT_ERROR(E_WINAPI);
 			p_env->last_err = E_WINAPI;
@@ -260,7 +274,7 @@ int server_destroy_clients(struct serv_env *p_env)
 		return E_WINAPI;
 	}
 
-	res = server_check_thread_status(p_env, 200);
+	res = server_check_thread_status(p_env, SERVER_WAIT_ON_THREAD_MS);
 
 	return res;
 }
@@ -273,7 +287,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 	HANDLE *p_h_client_thread = NULL;
 	FD_SET readfs;
 	DWORD idx;
-	TIMEVAL tv = {0, 1000}; // FIXME:
+	TIMEVAL tv = {0, SERVER_TCP_WAIT_CONNECT_US};
 
 	// char buffer[100];
 
@@ -289,6 +303,10 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 	/* socket is signald */
 	if (res) {
+
+		res = server_lock(p_env);
+		if (res != E_SUCCESS)
+			return res;
 
 		/* check if more connections can be accepted */
 		if (!BitScanForward(&idx, ~p_env->thread_bitmap)) {
@@ -306,6 +324,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 		/* set client params */
 		p_client = &p_env->client[idx];
 		memset(p_client, 0, sizeof(*p_client));
+		p_client->id = idx;
 		p_client->skt = new_skt;
 		p_client->p_env = p_env;
 
@@ -324,6 +343,10 @@ int serv_clnt_connect(struct serv_env *p_env)
 		/* mark thread handle as taken */
 		SET_BIT(p_env->thread_bitmap, idx);
 		DBG_TRACE_STR(TRACE_SERVER, SERVER, "start TCP connection %d", idx);
+
+		res = server_release(p_env);
+		if (res != E_SUCCESS)
+			return res;
 	}
 	
 	return E_SUCCESS;
@@ -333,12 +356,20 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 {
 	DWORD wait_code;
 	HANDLE *p_h_client_thread = NULL;
+	int res = E_SUCCESS;
 
-	for (int idx = 0; idx < MAX_CONNECTIONS; idx++) {
+	res = server_lock(p_env);
+	if (res != E_SUCCESS)
+		return res;
 
+	/* loop all thread positions */
+	for (int idx = 0; (idx < MAX_CONNECTIONS) && (res == E_SUCCESS); idx++) {
+
+		/* check that thread is active */
 		if (!TEST_BIT(p_env->thread_bitmap, idx))
 			continue;
 		
+		/* check if thread exited - if did do cleanup */
 		p_h_client_thread = &p_env->h_client_thread[idx];
 		wait_code = WaitForSingleObject(*p_h_client_thread, ms);
 		switch (wait_code)
@@ -348,7 +379,7 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 		case WAIT_OBJECT_0:
 			if (!CloseHandle(*p_h_client_thread)) {
 				PRINT_ERROR(E_WINAPI);
-				return E_WINAPI;
+				res = E_WINAPI;
 			}
 			DBG_TRACE_STR(TRACE_SERVER, SERVER, "end TCP connection   %d", idx);
 			CLR_BIT(p_env->thread_bitmap, idx);
@@ -357,17 +388,20 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 			/* fall through */
 		default:
 			PRINT_ERROR(E_WINAPI);
-			return E_WINAPI;
+			res = E_WINAPI;
 		}
 	}
 
-	return E_SUCCESS;
+	res |= server_release(p_env);
+
+	return res;
 }
 
 bool server_check_abort(struct serv_env *p_env)
 {
 	DWORD wait_code;
 
+	/* check if main thread signald abort */
 	wait_code = WaitForSingleObject(p_env->h_abort_evt, 0);
 	switch (wait_code)
 	{
@@ -420,6 +454,13 @@ int server_cleanup(struct serv_env *p_env)
 		}
 	}
 
+	if (p_env->h_client_approve_mtx) {
+		if (!CloseHandle(p_env->h_client_approve_mtx)) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_WINAPI;
+		}
+	}
+
 	if (game_cleanup(&p_env->game) != E_SUCCESS) {
 		ret_val = E_WINAPI;
 	}
@@ -461,13 +502,16 @@ int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_s
 	TIMEVAL tv;
 	int res = E_SUCCESS;
 
+	/* convert to time inceremtns */
 	int incerments = timeout_sec * (SEC2MS / (MSG_TIME_INCERMENT_USEC / MS2US));
 
+	/* wait is split to allow checking abort from main thread */
 	while (incerments--) {
 
 		if (server_check_abort(p_client->p_env))
 			return E_INTERNAL;
 
+		
 		tv.tv_sec  = 0;
 		tv.tv_usec = MSG_TIME_INCERMENT_USEC;
 		res = recv_msg(p_p_msg, p_client->skt, &tv);
@@ -477,8 +521,38 @@ int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_s
 			break;
 	}
 
+	/* trace */
 	if (p_client->connected && (res == E_SUCCESS))
 		DBG_TRACE_MSG(TRACE_THREAD, p_client->username, *p_p_msg);
 
 	return res;
+}
+
+int server_release(struct serv_env *p_env)
+{
+	if (!ReleaseMutex(p_env->h_client_approve_mtx)) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	return E_SUCCESS;
+}
+
+int server_lock(struct serv_env *p_env)
+{
+	DWORD wait_code;
+
+	wait_code = WaitForSingleObject(p_env->h_client_approve_mtx, 5000);
+	switch (wait_code) {
+	case WAIT_FAILED:
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	case WAIT_OBJECT_0:
+		return E_SUCCESS;
+	case WAIT_TIMEOUT:
+		PRINT_ERROR(E_INTERNAL);
+		return E_TIMEOUT;
+	default:
+		return E_FAILURE;
+	}
 }
