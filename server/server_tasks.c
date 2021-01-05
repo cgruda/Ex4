@@ -19,7 +19,6 @@
 #define _CRT_SECURE_NO_WARNINGS		// FIXME:
 
 #pragma comment(lib, "ws2_32.lib")
-#include "winsock2.h"
 
 /*
  ==============================================================================
@@ -45,7 +44,7 @@
 
 void print_usage()
 {
-	printf("\nusage:\n\tserver.exe <server ip> <port>\n\n");
+	printf("\nusage:\n\tserver.exe <port>\n\n");
 }
 
 int check_input(struct serv_env *p_env, int argc, char **argv)
@@ -59,15 +58,8 @@ int check_input(struct serv_env *p_env, int argc, char **argv)
 		return E_FAILURE;
 	}
 
-	/* check server ip */
-	if (inet_addr(argv[1]) == INADDR_NONE) {
-		printf("\n%s is not a valid ip addres", argv[1]);
-		ret_val = E_FAILURE;
-	}
-	p_env->server_ip = argv[1];
-
 	/* check port number */
-	port = strtol(argv[2], NULL, 10);
+	port = strtol(argv[1], NULL, 10);
 	if (!((port > 0) && (port < MAX_PORT))) {
 		printf("\n%s is not a valid port", argv[2]);
 		ret_val = E_FAILURE;
@@ -86,12 +78,12 @@ int serv_quit_init(struct serv_env *p_env)
 	
 	/* create file handle for stdin */
 	p_env->h_stdin = CreateFileA(PATH_STDIN,           /* standard input    */
-					  GENERIC_READ,         /* we want to read   */
-					  FILE_SHARE_READ,      /* others may use    */
-					  NULL,                 /* default security  */
-					  OPEN_EXISTING,        /* stdin exists      */
-					  FILE_FLAG_OVERLAPPED, /* asynchronous read */
-					  NULL);                /* no template       */
+				     GENERIC_READ,         /* we want to read   */
+				     FILE_SHARE_READ,      /* others may use    */
+				     NULL,                 /* default security  */
+				     OPEN_EXISTING,        /* stdin exists      */
+				     FILE_FLAG_OVERLAPPED, /* asynchronous read */
+				     NULL);                /* no template       */
 	if (p_env->h_stdin == INVALID_HANDLE_VALUE) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
@@ -106,11 +98,11 @@ int serv_quit_init(struct serv_env *p_env)
 
 	/* read stdin asynchronously for exit command.
 	 * asynchronous read must always return false.
-	 * error is detected by checking WSA last error.
+	 * error is detected by checking winapi last error.
 	 * io_pending designates i/o pending completion,
 	 * and is thus not treated as an error. */
-	res = ReadFile(p_env->h_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin); // FIXME: 4
-	if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
+	res = ReadFile(p_env->h_stdin, p_env->buffer, 4, NULL, &p_env->olp_stdin);
+	if ((res) || (GetLastError() != ERROR_IO_PENDING)) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
@@ -138,7 +130,7 @@ int serv_comm_init(struct serv_env *p_env)
 
 	/* set server address */
 	p_env->server.sin_family      = AF_INET;
-	p_env->server.sin_addr.s_addr = inet_addr(p_env->server_ip);
+	p_env->server.sin_addr.s_addr = htonl(INADDR_ANY);
 	p_env->server.sin_port        = htons(p_env->server_port);
 
 	/* bind socket to ip and port */
@@ -239,7 +231,7 @@ bool server_quit(struct serv_env *p_env)
 
 	/* if command is NOT "exit" - reset read event
 	 * and start a new asynchronous read. else */
-	if (strncmp(p_env->buffer, SERVER_EXIT_COMMAND, SERVER_EXIT_COMMAND_LEN)) { // FIXME: exitXXX...
+	if (strncmp(p_env->buffer, SERVER_EXIT_COMMAND, SERVER_EXIT_COMMAND_LEN)) {
 		if (!ResetEvent(p_env->olp_stdin.hEvent)) {
 			PRINT_ERROR(E_WINAPI);
 			p_env->last_err = E_WINAPI;
@@ -247,11 +239,11 @@ bool server_quit(struct serv_env *p_env)
 		}
 		/* read stdin asynchronously for exit command.
 		 * asynchronous read must always return false.
-		 * error is detected by checking WSA last error.
+		 * error is detected by checking winapi last error.
 		 * io_pending designates i/o pending completion,
 		 * and is thus not treated as an error. */
 		res = ReadFile(p_env->h_stdin, p_env->buffer, SERVER_EXIT_COMMAND_LEN - 1, NULL, &p_env->olp_stdin);
-		if ((res) || (WSAGetLastError() != ERROR_IO_PENDING)) {
+		if ((res) || (GetLastError() != ERROR_IO_PENDING)) {
 			PRINT_ERROR(E_WINAPI);
 			p_env->last_err = E_WINAPI;
 			return true;

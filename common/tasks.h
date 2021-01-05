@@ -5,7 +5,7 @@
  *
  * messages.h
  * 
- * this is the header file of the messages module
+ * this is the header file of the tasks module
  * 
  * by: Chaim Gruda
  *     Nir Beiber
@@ -59,6 +59,7 @@ enum err_val {
 	E_WINAPI,
 	E_WINSOCK,
 	E_FLOW,
+	E_GRACEFUL,
 	E_MAX
 };
 
@@ -93,15 +94,6 @@ enum err_val {
  * DECLARATIONS
  ==============================================================================
  */
-
-/**
- ******************************************************************************
- * @brief TODO:
- * @param 
- * @return 
- ******************************************************************************
- */
-int my_atoi(char *str, int *p_result);
 
 /**
  ******************************************************************************

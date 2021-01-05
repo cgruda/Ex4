@@ -9,10 +9,6 @@
  *     Nir Beiber
  */
 
-#define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
-
 /*
  ==============================================================================
  * INCLUDES
@@ -51,8 +47,6 @@ int main(int argc, char **argv)
 	ret_val = client_cleanup(&env);
 
 	/* exit program */
-	char *b = calloc(1, 10);
-
 	printf("--- CLIENT EXIT 0x%x ---\n", ret_val);
 	return ret_val;
 }

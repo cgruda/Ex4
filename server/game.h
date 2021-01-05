@@ -31,8 +31,12 @@
  */
 
 #define GAME_MAX_PLAYERS              2
-#define GAME_OPP_WAIT_TIME_MS         29000 // FIXME:
+#define GAME_OPP_WAIT_TIME_MS         29000 // FIXME: ot 10 mins?
+#define BULLS_WIN                     4
+#define SEQUENCE_BUFF_LEN             25
+#define RESULT_FORMAT_STRLEN          4
 #define PATH_GAME_SESSION            "GameSession.txt"
+#define RESULT_FORMAT_STR            "%d.%d"
 
 /*
  ==============================================================================

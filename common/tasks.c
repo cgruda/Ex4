@@ -5,7 +5,8 @@
  *
  * tasks.c
  * 
- * TODO:
+ * this is tasks module used for common functions and defnies
+ * for server and client.
  * 
  * by: Chaim Gruda
  *     Nir Beiber
@@ -85,26 +86,6 @@ void print_error(int err_val)
 	default:
 		printf("Unknown Error 0x%02X\n", err_val);
 	}
-}
-
-int my_atoi(char *str, int *p_result)
-{
-	if (!str || !p_result)
-		return E_FAILURE;
-
-	if ((*str != '+') && (*str != '-') && (!isdigit(*str)))
-		return E_FAILURE;
-
-	while (*(str++))
-		if (!isdigit(*str))
-			return E_FAILURE;
-
-	*p_result = strtol(str, NULL, 10);
-
-	if (errno == ERANGE)
-		return E_FAILURE;
-
-	return E_SUCCESS;
 }
 
 #if DBG_TRACE // FIXME:

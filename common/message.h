@@ -27,6 +27,8 @@
 #define MSG_TIMOUT_SEC_HUMAN_MAX     900 // 15 mins
 #define MSG_MAX_PARAMS               4
 #define MSG_TIME_INCERMENT_USEC      (250 * MS2US)
+#define MSG_BUFF_MAX                 100
+
 /*
  ==============================================================================
  * ENUMERATIONS

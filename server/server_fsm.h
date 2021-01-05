@@ -5,6 +5,8 @@
  *
  * server_fsm.h
  * 
+ * header file of server fsm module
+ * 
  * by: Chaim Gruda
  *     Nir Beiber
  */

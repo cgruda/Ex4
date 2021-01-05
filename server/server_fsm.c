@@ -1,16 +1,27 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client side
+ * server program
  *
- * client_tasks.c
+ * server_fsm.c
+ * 
+ * this is part of the server FSM (finite state machine) module.
+ * each function is this module a state the server thread can be in.
+ * each function (state) returns the next state. moving between
+ * states is done using an array of funtions, where functions
+ * are indexed by their states, as defined in enum state_clnt.
+ *
+ * the first state in the FSM is: SERVER_FSM_CONNECT
+ * the last state in the FSM is: SERVER_FSM_EXIT
+ *
+ * in some cases a state will directly call a differet function,
+ * without changing the actual state. this is valid operation.
  * 
  * by: Chaim Gruda
  *     Nir Beiber
  */
-#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
-#define _CRT_SECURE_NO_WARNINGS
-#pragma comment(lib, "Shlwapi.lib")
+
+#define _CRT_SECURE_NO_WARNINGS // FIXME:
 
 /*
  ==============================================================================
@@ -20,7 +31,7 @@
 
 #include <stdio.h>
 #include <assert.h>
-#include "Shlwapi.h"
+#include "winsock2.h"
 #include "server_tasks.h"
 #include "server_fsm.h"
 #include "message.h"
@@ -70,7 +81,7 @@ int server_fsm_abort(struct client *p_client)
 	if (p_client->username)
 		DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
-	if (p_client->username && (p_client->last_err != E_SUCCESS))
+	if (p_client->username && (p_client->last_err != E_SUCCESS) && (p_client->last_err != E_GRACEFUL))
 		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "abort due to error: 0x%X", p_client->last_err);
 	
 	/* redirect to disconnect or cleanup */
@@ -84,11 +95,24 @@ int server_fsm_disconnect(struct client *p_client)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 
-	/* exit game. no ponit to check error since
+	int res;
+
+	/* exit game. no point to check error since
 	 * thread is exiting anyway. error print will
 	 * come from within call */
 	if (p_client->playing)
 		game_session_end(p_client);
+
+	/* handle gracefull disconnect: indicate server has no
+	 * more data to send, closesocket at server_fsm_cleanup() */
+	if (p_client->last_err == E_GRACEFUL) {
+		res = shutdown(p_client->skt, SD_SEND);
+		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "gracefull disconnect");
+		if (res == SOCKET_ERROR)
+			PRINT_ERROR(E_WINSOCK);
+		else
+			p_client->last_err = E_SUCCESS;
+	}
 
 	/* allowing other clients to be approved by server */
 	if (!ReleaseSemaphore(p_client->p_env->h_client_approve_smpr, 1, NULL))
@@ -148,6 +172,7 @@ int server_fsm_menu(struct client *p_client)
 		next_state = SERVER_FSM_GAME_REQ;
 		break;
 	case MSG_CLIENT_DISCONNECT:
+		p_client->last_err = E_GRACEFUL;
 		next_state = SERVER_FSM_DISCONNECT;
 		break;
 	default:
@@ -167,7 +192,7 @@ int server_fsm_game_request(struct client *p_client)
 
 	int res, next_state;
 	struct game *p_game = NULL;
-	char buff[25] = {0}; // FIXME:
+	char buff[SEQUENCE_BUFF_LEN] = {0};
 
 	/* start/join a game */
 	res = game_session_start(p_client);
@@ -212,8 +237,7 @@ int server_fsm_invite_and_setup(struct client *p_client)
 
 	int res, next_state;
 	struct msg *p_msg = NULL;
-	char dummy_write[25] = {0}; // FIXME:
-	char dummy_read[25] = {0}; // FIXME:
+	char dummy_write[SEQUENCE_BUFF_LEN] = {0}, dummy_read[SEQUENCE_BUFF_LEN] = {0};
 	memcpy(dummy_write, p_client->opp_username, strlen(p_client->opp_username));
 
 	/* send game invite */
@@ -245,8 +269,7 @@ int server_fsm_invite_and_setup(struct client *p_client)
 	}
 
 	/* store setup numbers */
-	memcpy(p_client->setup_numbers, p_msg->param_lst[0], 4); // FIXME:
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "setup: %s", p_client->setup_numbers);
+	memcpy(p_client->setup_numbers, p_msg->param_lst[0], 4);
 
 	/* free resource */
 	free_msg(&p_msg);
@@ -413,62 +436,36 @@ int server_fsm_opponent_quit(struct client *p_client)
 int server_fsm_player_move(struct client *p_client)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-	
-	int res = E_SUCCESS, next_state = SERVER_FSM_ABORT;
+
+	int res = E_SUCCESS, next_state = SERVER_FSM_ABORT, bulls = 0, cows = 0;
+	char opp_guess[10] = {0}, send_result[10] = {0}, recv_result[10] = {0};
+	char *winner_name = NULL, bulls_s[2] = {0}, cows_s[2] = {0};
 	struct msg *p_msg = NULL;
-	int bulls = 0, cows = 0;
 	bool i_won = false, opp_won = false;
-	char opp_guess[10] = {0}; // FIXME:
-	char result[10] = {0}, result2[10] = {0}; // FIXME:
-	char b[2] = {0}, c[2] = {0}; // FIXME:
-	char *winner_name = NULL;
 	
 	/* request plalyer to make a guess */
-	res = server_send_msg(p_client, MSG_SERVER_PLAYER_MOVE_REQUEST, NULL, NULL, NULL, NULL);
-	if (res != E_SUCCESS) {
+	if ((res = server_send_msg(p_client, MSG_SERVER_PLAYER_MOVE_REQUEST, NULL, NULL, NULL, NULL)) != E_SUCCESS) {
 		p_client->last_err = res;
 		return SERVER_FSM_ABORT;
 	}
 
 	/* wait for guess */
-	res = server_recv_msg(p_client, &p_msg, MSG_TIMOUT_SEC_HUMAN_MAX);
-	if (res != E_SUCCESS) {
+	if ((res = server_recv_msg(p_client, &p_msg, MSG_TIMOUT_SEC_HUMAN_MAX)) != E_SUCCESS) {
 		p_client->last_err = res;
+		return SERVER_FSM_ABORT;
+	}
+
+	/* deal with unexpacted messages */
+	if (p_msg->type != MSG_CLIENT_PLAYER_MOVE) {
+		free_msg(&p_msg);
 		return SERVER_FSM_ABORT;
 	}
 
 	/* send guess to opponent, recieve opponent guess */
 	res = game_sequence(p_client, p_msg->param_lst[0], opp_guess);
-	switch (res) {
-	case E_SUCCESS:
-		next_state = SERVER_FSM_PLAY_MOVE;
-		break;
-	case E_TIMEOUT:
-		next_state = SERVER_FSM_OPP_QUIT;
-		break;
-	default:
-		p_client->last_err = res;
-		next_state = SERVER_FSM_ABORT;
-	}
-
 	free_msg(&p_msg);
 
-	/* state exit point */
-	if (next_state != SERVER_FSM_PLAY_MOVE)
-		return next_state;
-
-	/* calc opponents bulls and cows */
-	bulls = game_bulls(opp_guess, p_client->setup_numbers);
-	cows = game_cows(opp_guess, p_client->setup_numbers);
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "opp_guess=%s (setup_num=%s): b=%d, c=%d", opp_guess, p_client->setup_numbers, bulls, cows);
-
-	/* check if opponent won */
-	if (bulls == 4) // FIXME:
-		opp_won = true;
-
-	/* send opponent his bulls and cows, and get my own */
-	sprintf_s(result, 4, "%d.%d", bulls, cows);
-	res = game_sequence(p_client, result, result2);
+	/* check sequence result */
 	switch (res) {
 	case E_SUCCESS:
 		break;
@@ -478,22 +475,35 @@ int server_fsm_player_move(struct client *p_client)
 		p_client->last_err = res;
 		return SERVER_FSM_ABORT;
 	}
-	sscanf_s(result2, "%d.%d", &bulls, &cows);
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "my_guess resulted with: b=%d, c=%d (%s)", bulls, cows, result2);
-	/* check if i won */
-	if (bulls == 4) // FIXME:
-		i_won = true;
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "my_guess resulted with: b=%d, c=%d (%s), i_wan=%d", bulls, cows, result2, i_won);
 
+	/* calc opponents bulls and cows */
+	bulls = game_bulls(opp_guess, p_client->setup_numbers);
+	cows = game_cows(opp_guess, p_client->setup_numbers);
+	opp_won = (bulls == BULLS_WIN);
+
+	/* send opponent his bulls and cows, and get my own */
+	sprintf_s(send_result, RESULT_FORMAT_STRLEN, RESULT_FORMAT_STR, bulls, cows);
+	res = game_sequence(p_client, send_result, recv_result);
+	switch (res) {
+	case E_SUCCESS:
+		break;
+	case E_TIMEOUT:
+		return SERVER_FSM_OPP_QUIT;
+	default:
+		p_client->last_err = res;
+		return SERVER_FSM_ABORT;
+	}
+	sscanf_s(recv_result, RESULT_FORMAT_STR, &bulls, &cows);
+	i_won = (bulls == BULLS_WIN);
+	bulls_s[0] = '0' + bulls;
+	cows_s[0] = '0' + cows;
 
 	/* check results */
-	b[0] = '0' + bulls;
-	c[0] = '0' + cows;
 	if (i_won && opp_won) {
 		res = server_send_msg(p_client, MSG_SERVER_DRAW, NULL, NULL, NULL, NULL);
 		next_state = SERVER_FSM_MENU;
 	} else if (!i_won && !opp_won) {
-		res = server_send_msg(p_client, MSG_SERVER_GAME_RESULTS, b, c, p_client->opp_username, opp_guess);
+		res = server_send_msg(p_client, MSG_SERVER_GAME_RESULTS, bulls_s, cows_s, p_client->opp_username, opp_guess);
 		next_state = SERVER_FSM_PLAY_MOVE;
 	} else {
 		winner_name = i_won ? p_client->username : p_client->opp_username;
@@ -502,7 +512,7 @@ int server_fsm_player_move(struct client *p_client)
 		case E_SUCCESS:
 			break;
 		case E_TIMEOUT:
-			return SERVER_FSM_OPP_QUIT; // FIXME:
+			return SERVER_FSM_OPP_QUIT;
 		default:
 			p_client->last_err = res;
 			return SERVER_FSM_ABORT;
@@ -522,7 +532,7 @@ int server_fsm_player_move(struct client *p_client)
 	return next_state;
 }
 
-// fsm functions
+/* server finite state machine functions array */
 int(*server_fsm[SERVER_FSM_MAX])(struct client *p_client) =
 {
 	[SERVER_FSM_CONNECT]    = server_fsm_connect,

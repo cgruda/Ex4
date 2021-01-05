@@ -35,7 +35,8 @@
  */
 
 // input arguments count
-#define SERVER_ARGC                  3
+#define SERVER_ARGC                  2
+#define EXIT_CMD                     7
 
 // allow 3 threads to be created
 #define MAX_CONNECTIONS              3
@@ -74,7 +75,6 @@ struct client {
 struct serv_env {
 	WSADATA	wsa_data;
 	int server_skt;
-	char *server_ip;
 	USHORT server_port;
 	SOCKADDR_IN server;
 	HANDLE h_client_approve_smpr;
@@ -82,7 +82,7 @@ struct serv_env {
 	HANDLE h_abort_evt;
 	HANDLE h_stdin;
 	OVERLAPPED olp_stdin;
-	char buffer[7]; // FIXME: use define
+	char buffer[EXIT_CMD];
 	DWORD thread_bitmap;
 	struct client client[MAX_CONNECTIONS];
 	HANDLE h_client_thread[MAX_CONNECTIONS];

@@ -30,6 +30,7 @@
  ==============================================================================
  */
 
+#include "winsock2.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
@@ -77,10 +78,22 @@ int client_fsm_disconnect(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 
+	int res;
+
 	/* send disconncet message, return value does not matter
 	 * since we are on way out anyway. arror messages will
 	 * be printed from within call */
-	client_send_msg(p_env, MSG_CLIENT_DISCONNECT, NULL);
+	res = client_send_msg(p_env, MSG_CLIENT_DISCONNECT, NULL);
+
+	/* message was sent successfully, signal end of session
+	 * and that client has no more data to send */
+	if (res == E_SUCCESS) {
+		if (shutdown(p_env->skt, SD_SEND) == SOCKET_ERROR)
+			PRINT_ERROR(E_WINSOCK);
+		DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "gracefull disconnect");
+	}
+	
+	/*closesocket is called at client_cleanup() */
 
 	/* change approval state */
 	p_env->approved = false;
@@ -361,7 +374,7 @@ int client_fsm_game_move(struct client_env *p_env)
 		res = client_send_msg(p_env, MSG_CLIENT_PLAYER_MOVE, buff);
 		if (res != E_SUCCESS) {
 			p_env->last_err = res;
-			next_state = CLIENT_FSM_DISCONNECT;
+			next_state = CLIENT_FSM_CONNECT_FAIL; // FIXME: why disconnect?
 			break;
 		}
 

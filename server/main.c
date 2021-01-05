@@ -1,17 +1,13 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client side
+ * server program
  *
  * main.c
  * 
  * by: Chaim Gruda
  *     Nir Beiber
  */
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS // FIXME:
-
-#pragma comment(lib, "ws2_32.lib")
 
 /*
  ==============================================================================
@@ -19,8 +15,6 @@
  ==============================================================================
  */
 
-#include "winsock2.h"
-#include <stdint.h>
 #include <stdio.h>
 #include "server_tasks.h"
 #include "tasks.h"

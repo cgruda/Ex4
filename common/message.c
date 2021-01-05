@@ -108,6 +108,8 @@ int msg_2_buff(char *buff, struct msg *p_msg)
 	/* as instructed in forum */
 	buff[offset++] = '\n';
 
+	printf("TX:  %s", buff);
+
 	return offset;
 }
 
@@ -142,6 +144,8 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 	int idx, res = E_SUCCESS;
 
 	*p_p_msg = NULL;
+
+	printf("RX:  %s", buff);
 
 	/* allocate mem */
 	p_msg = calloc(1, sizeof(*p_msg));
@@ -243,8 +247,8 @@ int send_msg(int skt, struct msg **p_p_msg)
 {
 	char *buffer = NULL;
 	struct msg *p_msg = *p_p_msg;
-	int ret_val;
-	int buff_len;
+	int ret_val = E_SUCCESS;
+	int buff_len, bytes_sent = 0;
 	int res;
 
 	/* sanity */
@@ -266,14 +270,20 @@ int send_msg(int skt, struct msg **p_p_msg)
 		msg_2_buff(buffer, p_msg);
 
 		/* send message */
-		res = send(skt, buffer, buff_len + 1, 0);
-		if (res == SOCKET_ERROR) { // FIXME: partial send
-			ret_val = E_WINSOCK;
-			break;
-		}
+		while (bytes_sent < (buff_len + 1)) {
 
-		/* message has been sent */
-		ret_val = E_SUCCESS;
+			res = send(skt, (buffer + bytes_sent), (buff_len + 1), 0);
+			if (res == SOCKET_ERROR) {
+				ret_val = E_WINSOCK;
+				break;
+			}
+
+			if (ret_val != E_SUCCESS)
+				break;
+			
+			bytes_sent += res;
+			buff_len -= bytes_sent;
+		}
 
 	} while (0);
 
@@ -286,7 +296,7 @@ int send_msg(int skt, struct msg **p_p_msg)
 
 int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 {
-	char buff[100] = {0}; // FIXME:
+	char buff[MSG_BUFF_MAX] = {0};
 	int res, ret_val = E_SUCCESS;
 	int msg_len;
 	FD_SET readfs;
@@ -305,17 +315,19 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 	 * first peek to determine up to where to read.
 	 * if the peer closed the socket gracfully and all
 	 * data was already read, than act as if got timeout */
-	res = recv(skt, buff, 100, MSG_PEEK);
+	res = recv(skt, buff, MSG_BUFF_MAX, MSG_PEEK);
 	if (res == 0)
-		return E_TIMEOUT;
-	if (res == SOCKET_ERROR)
+		return E_GRACEFUL;
+	else if (res == SOCKET_ERROR)
 		return E_WINSOCK;
 
 	/* recieve message */
 	msg_len = strlen(buff);
-	memset(buff, 0, 100);
-	res = recv(skt, buff, msg_len + 1, 0);
-	if (res == SOCKET_ERROR)
+	memset(buff, 0, MSG_BUFF_MAX);
+	res = recv(skt, buff, msg_len + 1, 0); // FIXME:
+	if (res == 0)
+		return E_GRACEFUL;
+	else if (res == SOCKET_ERROR)
 		return E_WINSOCK;
 
 	/* parse message */
@@ -327,7 +339,7 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 #if DBG_TRACE
 char *dbg_trace_msg_2_str(struct msg *p_msg)
 {
-	char *p, *str = calloc(100, sizeof(char)); // FIXME:
+	char *p, *str = calloc(MSG_BUFF_MAX, sizeof(char)); // FIXME:
 	if (!str) {
 		PRINT_ERROR(E_INTERNAL);
 		exit(E_FAILURE);

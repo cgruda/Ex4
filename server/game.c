@@ -447,8 +447,6 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 	if (res != E_SUCCESS)
 		return res;
 
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "LOCK");
-
 	/* early indication that opponent quit */
 	if (p_client->playing      &&
 	    p_client->opp_username &&
@@ -477,7 +475,6 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 		res = game_release(p_game);
 		if (res != E_SUCCESS)
 			break;
-		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "RELEASE");
 		wait_code = WaitForSingleObject(*h_evt, GAME_OPP_WAIT_TIME_MS);
 		if (wait_code == WAIT_TIMEOUT) {
 			res = E_TIMEOUT;
@@ -486,7 +483,6 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 			res = game_lock(p_game);
 			if (res != E_SUCCESS)
 				break;
-			DBG_TRACE_STR(TRACE_THREAD, p_client->username, "LOCK");
 			res = game_session_read(p_client, read_buff);
 			if (res != E_SUCCESS)
 				break;
@@ -500,7 +496,6 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 	/* free game lock */
 	if (res != E_TIMEOUT) {
 		res |= game_release(p_game);
-		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "RELEASE");
 	}
 
 	return res;
