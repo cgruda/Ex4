@@ -31,7 +31,9 @@
  */
 
 #define GAME_MAX_PLAYERS              2
-#define GAME_OPP_WAIT_TIME_MS         29000 // FIXME: ot 10 mins?
+#define GAME_START_WAIT_TIME_SEC      15
+#define GAME_MOVE_WAIT_TIME_SEC       900 // 15 mins
+#define GAME_INTERNAL_WAIT_TIME_SEC   20
 #define BULLS_WIN                     4
 #define SEQUENCE_BUFF_LEN             25
 #define RESULT_FORMAT_STRLEN          4
@@ -103,12 +105,14 @@ int game_session_end(struct client *p_client);
  * @param p_client pointer to client struct
  * @param write_buff data to be written in GameSession file
  * @param read_buff data that has been read from GameSession file
+ * @param timeout_sec max sequence time in seconds
  * @return E_SUCCESS on success
  *         E_TIMEOUT if sync with secind thread is lost
  *         other err_vals on error
  ******************************************************************************
  */
-int game_sequence(struct client *p_client, char *write_buff, char *read_buff);
+int game_sequence(struct client *p_client, char *write_buff, char *read_buff,
+			int timeout_sec);
 
 /**
  ******************************************************************************

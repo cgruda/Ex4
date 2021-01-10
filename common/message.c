@@ -108,8 +108,6 @@ int msg_2_buff(char *buff, struct msg *p_msg)
 	/* as instructed in forum */
 	buff[offset++] = '\n';
 
-	printf("TX:  %s", buff);
-
 	return offset;
 }
 
@@ -144,8 +142,6 @@ int buff_2_msg(char *buff, struct msg **p_p_msg)
 	int idx, res = E_SUCCESS;
 
 	*p_p_msg = NULL;
-
-	printf("RX:  %s", buff);
 
 	/* allocate mem */
 	p_msg = calloc(1, sizeof(*p_msg));
@@ -311,20 +307,24 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 	else if (res == SOCKET_ERROR)
 		return E_WINSOCK;
 
-	/* since server can send multiple messages at once,
-	 * first peek to determine up to where to read.
-	 * if the peer closed the socket gracfully and all
-	 * data was already read, than act as if got timeout */
-	res = recv(skt, buff, MSG_BUFF_MAX, MSG_PEEK);
-	if (res == 0)
-		return E_GRACEFUL;
-	else if (res == SOCKET_ERROR)
-		return E_WINSOCK;
+	/* peek untill got a full message, infdicated by
+	 * EOL, then reed inly up to there, leaving next
+	 * messages still in socket queue */
+	do {
+		res = recv(skt, buff, MSG_BUFF_MAX, MSG_PEEK);
+		if (res == 0)
+			return E_GRACEFUL;
+		else if (res == SOCKET_ERROR)
+			return E_WINSOCK;
+		
+		if (strchr(buff, '\n'))
+			break;
+	} while (1);
 
 	/* recieve message */
 	msg_len = strlen(buff);
 	memset(buff, 0, MSG_BUFF_MAX);
-	res = recv(skt, buff, msg_len + 1, 0); // FIXME:
+	res = recv(skt, buff, msg_len + 1, 0);
 	if (res == 0)
 		return E_GRACEFUL;
 	else if (res == SOCKET_ERROR)

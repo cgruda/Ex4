@@ -21,8 +21,8 @@
  *     Nir Beiber
  */
 
-#define _WINSOCK_DEPRECATED_NO_WARNINGS // FIXME:
-#define _CRT_SECURE_NO_WARNINGS
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS// FIXME:
 
 /*
  ==============================================================================
@@ -48,7 +48,6 @@
 int client_fsm_connect(struct client_env *p_env)
 {
 	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	assert(!p_env->approved);
 
 	int res;
 
@@ -374,7 +373,7 @@ int client_fsm_game_move(struct client_env *p_env)
 		res = client_send_msg(p_env, MSG_CLIENT_PLAYER_MOVE, buff);
 		if (res != E_SUCCESS) {
 			p_env->last_err = res;
-			next_state = CLIENT_FSM_CONNECT_FAIL; // FIXME: why disconnect?
+			next_state = CLIENT_FSM_CONNECT_FAIL;
 			break;
 		}
 

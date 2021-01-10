@@ -434,7 +434,7 @@ int game_session_read(struct client *p_client, char *buffer)
 	return res;
 }
 
-int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
+int game_sequence(struct client *p_client, char *write_buff, char *read_buff, int timeout_sec)
 {
 	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 	struct game *p_game = &p_client->p_env->game;
@@ -475,7 +475,7 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff)
 		res = game_release(p_game);
 		if (res != E_SUCCESS)
 			break;
-		wait_code = WaitForSingleObject(*h_evt, GAME_OPP_WAIT_TIME_MS);
+		wait_code = WaitForSingleObject(*h_evt, timeout_sec * SEC2MS);
 		if (wait_code == WAIT_TIMEOUT) {
 			res = E_TIMEOUT;
 			break;

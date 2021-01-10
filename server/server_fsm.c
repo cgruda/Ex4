@@ -207,7 +207,7 @@ int server_fsm_game_request(struct client *p_client)
 	}
 
 	/* await for opponent client to join game */
-	res = game_sequence(p_client, p_client->username, buff);
+	res = game_sequence(p_client, p_client->username, buff, GAME_START_WAIT_TIME_SEC);
 	switch (res) {
 	case E_SUCCESS:
 		p_client->opp_username = calloc(strlen(buff) + 1, sizeof(char));
@@ -274,8 +274,8 @@ int server_fsm_invite_and_setup(struct client *p_client)
 	/* free resource */
 	free_msg(&p_msg);
 
-	/* sync with opponent thread */
-	res = game_sequence(p_client, dummy_write, dummy_read);
+	/* sync with opponent thread, use dummy buffers */
+	res = game_sequence(p_client, dummy_write, dummy_read, GAME_MOVE_WAIT_TIME_SEC);
 	switch (res) {
 	case E_SUCCESS:
 		next_state = SERVER_FSM_PLAY_MOVE;
@@ -462,7 +462,7 @@ int server_fsm_player_move(struct client *p_client)
 	}
 
 	/* send guess to opponent, recieve opponent guess */
-	res = game_sequence(p_client, p_msg->param_lst[0], opp_guess);
+	res = game_sequence(p_client, p_msg->param_lst[0], opp_guess, GAME_MOVE_WAIT_TIME_SEC);
 	free_msg(&p_msg);
 
 	/* check sequence result */
@@ -483,7 +483,7 @@ int server_fsm_player_move(struct client *p_client)
 
 	/* send opponent his bulls and cows, and get my own */
 	sprintf_s(send_result, RESULT_FORMAT_STRLEN, RESULT_FORMAT_STR, bulls, cows);
-	res = game_sequence(p_client, send_result, recv_result);
+	res = game_sequence(p_client, send_result, recv_result, GAME_INTERNAL_WAIT_TIME_SEC);
 	switch (res) {
 	case E_SUCCESS:
 		break;
@@ -507,7 +507,7 @@ int server_fsm_player_move(struct client *p_client)
 		next_state = SERVER_FSM_PLAY_MOVE;
 	} else {
 		winner_name = i_won ? p_client->username : p_client->opp_username;
-		res = game_sequence(p_client, p_client->setup_numbers, opp_guess);
+		res = game_sequence(p_client, p_client->setup_numbers, opp_guess, GAME_INTERNAL_WAIT_TIME_SEC);
 		switch (res) {
 		case E_SUCCESS:
 			break;
