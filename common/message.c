@@ -75,13 +75,13 @@ int msg_buff_len(struct msg *p_msg)
 	int buff_len = 0;
 	
 	/* type str length */
-	buff_len += strlen(msg_type_2_str[p_msg->type]);
+	buff_len += (int)strlen(msg_type_2_str[p_msg->type]);
 
 	/* params len including delimiters */
 	if (p_msg->param_cnt) {
 		buff_len += p_msg->param_cnt;
 		for (int i = 0; i < p_msg->param_cnt; i++)
-			buff_len += strlen(p_msg->param_lst[i]);
+			buff_len += (int)strlen(p_msg->param_lst[i]);
 	}
 
 	/* add 1 for newly requested '\n' at message end */
@@ -95,14 +95,14 @@ int msg_2_buff(char *buff, struct msg *p_msg)
 
 	/* copy message text into buffer */
 	memcpy(buff, str, strlen(str));
-	offset += strlen(str);
+	offset += (int)strlen(str);
 
 	/* copy params into buffer */
 	for (int i = 0; i < p_msg->param_cnt; i++) {
 		buff[offset++] = i ? ';' : ':';
 		str = p_msg->param_lst[i];
 		memcpy(buff + offset, str, strlen(str));
-		offset += strlen(str);
+		offset += (int)strlen(str);
 	}
 
 	/* as instructed in forum */
@@ -121,7 +121,7 @@ int new_msg_param(char **p_param_dst, char *param_src)
 	*p_param_dst = NULL;
 
 	/* allocate param mem */
-	int mem_size = strlen(param_src) + 1;
+	int mem_size = (int)strlen(param_src) + 1;
 	*p_param_dst = calloc(mem_size, sizeof(char));
 	if (!*p_param_dst) {
 		PRINT_ERROR(E_STDLIB);
@@ -322,7 +322,7 @@ int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
 	} while (1);
 
 	/* recieve message */
-	msg_len = strlen(buff);
+	msg_len = (int)strlen(buff);
 	memset(buff, 0, MSG_BUFF_MAX);
 	res = recv(skt, buff, msg_len + 1, 0);
 	if (res == 0)

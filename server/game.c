@@ -356,7 +356,7 @@ int game_session_write(struct client *p_client, char *data)
 		}
 
 		/* write data */
-		res = WriteFile(h_file, data, strlen(data) + 1, NULL, NULL);
+		res = WriteFile(h_file, data, (int)strlen(data) + 1, NULL, NULL);
 		if (!res) {
 			PRINT_ERROR(E_WINAPI);
 			res = E_WINAPI;
