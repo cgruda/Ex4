@@ -37,7 +37,7 @@
  */
 
 struct client_env {
-	int skt;
+	SOCKET skt;
 	char  *server_ip;
 	USHORT server_port;
 	char *username;

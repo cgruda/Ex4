@@ -239,7 +239,7 @@ void free_msg(struct msg **p_p_msg)
 	*p_p_msg = NULL;
 }
 
-int send_msg(int skt, struct msg **p_p_msg)
+int send_msg(SOCKET skt, struct msg **p_p_msg)
 {
 	char *buffer = NULL;
 	struct msg *p_msg = *p_p_msg;
@@ -290,7 +290,7 @@ int send_msg(int skt, struct msg **p_p_msg)
 	return ret_val;
 }
 
-int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout)
+int recv_msg(struct msg **p_p_msg, SOCKET skt, PTIMEVAL p_timeout)
 {
 	char buff[MSG_BUFF_MAX] = {0};
 	int res, ret_val = E_SUCCESS;

@@ -104,7 +104,7 @@ void free_msg(struct msg **p_p_msg);
  *         E_WINSOCK - socket error
  ******************************************************************************
  */
-int send_msg(int skt, struct msg **p_p_msg);
+int send_msg(SOCKET skt, struct msg **p_p_msg);
 
 /**
  ******************************************************************************
@@ -119,7 +119,7 @@ int send_msg(int skt, struct msg **p_p_msg);
  *         E_WINSOCK - socket error            - no need to free msg
  ******************************************************************************
  */
-int recv_msg(struct msg **p_p_msg, int skt, PTIMEVAL p_timeout);
+int recv_msg(struct msg **p_p_msg, SOCKET skt, PTIMEVAL p_timeout);
 
 /**
  ******************************************************************************

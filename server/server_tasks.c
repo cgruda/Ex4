@@ -274,7 +274,7 @@ int server_destroy_clients(struct serv_env *p_env)
 int serv_clnt_connect(struct serv_env *p_env)
 {
 	int res;
-	int new_skt;
+	SOCKET new_skt;
 	struct client *p_client = NULL;
 	HANDLE *p_h_client_thread = NULL;
 	FD_SET readfs;
@@ -287,7 +287,7 @@ int serv_clnt_connect(struct serv_env *p_env)
 	FD_SET(p_env->server_skt, &readfs);
 
 	/* wait for socket to be signald */
-	res = select(p_env->server_skt + 1, &readfs, NULL, NULL, &tv);
+	res = select(0, &readfs, NULL, NULL, &tv);
 	if (res == SOCKET_ERROR) {
 		PRINT_ERROR(E_WINSOCK);
 		return E_WINSOCK;

@@ -60,7 +60,7 @@
 
 struct client {
 	int id;
-	int skt;
+	SOCKET skt;
 	bool connected;
 	bool playing;
 	char *username;
@@ -74,7 +74,7 @@ struct client {
 
 struct serv_env {
 	WSADATA	wsa_data;
-	int server_skt;
+	SOCKET server_skt;
 	USHORT server_port;
 	SOCKADDR_IN server;
 	HANDLE h_client_approve_smpr;
