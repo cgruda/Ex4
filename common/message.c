@@ -24,7 +24,6 @@
  ==============================================================================
  */
 
-#define _CRT_SECURE_NO_WARNINGS // FIXME:
 #pragma comment(lib, "ws2_32.lib")
 
 /*
@@ -335,29 +334,3 @@ int recv_msg(struct msg **p_p_msg, SOCKET skt, PTIMEVAL p_timeout)
 
 	return res;
 }
-
-#if DBG_TRACE
-char *dbg_trace_msg_2_str(struct msg *p_msg)
-{
-	char *p, *str = calloc(MSG_BUFF_MAX, sizeof(char)); // FIXME:
-	if (!str) {
-		PRINT_ERROR(E_INTERNAL);
-		exit(E_FAILURE);
-	}
-	p = str;
-
-	if (!p_msg) {
-		sprintf(p, "\n\t\tNULL\n");
-		p += strlen(p);
-	} else {
-		sprintf(p, "\n\t\ttype:     %s\n", msg_type_2_str[p_msg->type]);
-		p += strlen(p);
-		for (int i = 0; i < p_msg->param_cnt; i++) {
-			sprintf(p, "\t\tparam[%d]: %s\n", i, p_msg->param_lst[i]);
-			p += strlen(p);
-		}
-	}
-	sprintf(p, "\n");
-	return str;
-}
-#endif

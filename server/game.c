@@ -12,8 +12,6 @@
  *     Nir Beiber
  */
 
-#define _CRT_SECURE_NO_WARNINGS // FIXME:
-
 /*
  ==============================================================================
  * INCLUDES
@@ -129,8 +127,6 @@ int game_release(struct game *p_game)
 
 int destroy_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	struct game *p_game = &p_client->p_env->game;
 
 	/* make sure my event is down */
@@ -164,8 +160,6 @@ int destroy_game(struct client *p_client)
 
 int leave_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	struct game *p_game = &p_client->p_env->game;
 
 	/* make sure my event is down */
@@ -192,8 +186,6 @@ int leave_game(struct client *p_client)
 
 int join_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	struct game *p_game = &p_client->p_env->game;
 
 	/* update client */
@@ -210,8 +202,6 @@ int join_game(struct client *p_client)
 
 int create_game(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	struct game *p_game = &p_client->p_env->game;
 	HANDLE h_file = NULL;
 
@@ -247,8 +237,6 @@ int create_game(struct client *p_client)
 
 int game_session_start(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	struct game *p_game = &p_client->p_env->game;
 	int res;
 	bool other_players_available = false;
@@ -300,8 +288,6 @@ int game_session_start(struct client *p_client)
 
 int game_session_end(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res;
 	struct game *p_game = &p_client->p_env->game;
 
@@ -334,8 +320,6 @@ int game_session_end(struct client *p_client)
 
 int game_session_write(struct client *p_client, char *data)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	HANDLE h_file = NULL;
 	int res;
 
@@ -381,15 +365,11 @@ int game_session_write(struct client *p_client, char *data)
 		}
 	}
 
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "write: %s", data);
-
 	return res;
 }
 
 int game_session_read(struct client *p_client, char *buffer)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	HANDLE h_file = NULL;
 	int res;
 	buffer[0] = 0;
@@ -430,13 +410,11 @@ int game_session_read(struct client *p_client, char *buffer)
 		}
 	}
 
-	DBG_TRACE_STR(TRACE_THREAD, p_client->username, "read: %s", buffer);
 	return res;
 }
 
 int game_sequence(struct client *p_client, char *write_buff, char *read_buff, int timeout_sec)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 	struct game *p_game = &p_client->p_env->game;
 	HANDLE *h_evt = &p_game->h_play_evt[p_client->opp_pos];
 	DWORD wait_code;

@@ -11,10 +11,16 @@
  *     Nir Beiber
  */
 
-#include "tasks.h"
-
 #ifndef __MESSAGES_H__
 #define __MESSAGES_H__
+
+/*
+ ==============================================================================
+ * INCLUDES
+ ==============================================================================
+ */
+
+#include "tasks.h"
 
 /*
  ==============================================================================
@@ -120,17 +126,6 @@ int send_msg(SOCKET skt, struct msg **p_p_msg);
  ******************************************************************************
  */
 int recv_msg(struct msg **p_p_msg, SOCKET skt, PTIMEVAL p_timeout);
-
-/**
- ******************************************************************************
- * @brief convert messgae struct to human readable string
- * @param p_msg pointer to message
- * @return pointer to string holding messha in human readable foramt
- ******************************************************************************
- */
-#if DBG_TRACE
-char *dbg_trace_msg_2_str(struct msg *p_msg); // FIXME:
-#endif
 
 
 #endif // __MESSAGES_H__

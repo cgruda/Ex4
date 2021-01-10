@@ -16,7 +16,6 @@
  */
 
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS		// FIXME:
 
 #pragma comment(lib, "ws2_32.lib")
 
@@ -181,7 +180,6 @@ int serv_ctrl_init(struct serv_env *p_env)
 
 int server_init(struct serv_env *p_env)
 {
-	DBG_TRACE_INIT(TRACE_SERVER, SERVER);
 	int res;
 
 	/* quit logic init */
@@ -204,7 +202,6 @@ int server_init(struct serv_env *p_env)
 	if (res != E_SUCCESS)
 		return res;
 
-	DBG_TRACE_FUNC(TRACE_SERVER, SERVER);
 	return E_SUCCESS;
 }
 
@@ -250,14 +247,12 @@ bool server_quit(struct serv_env *p_env)
 		}
 		return false;
 	} else {
-		DBG_TRACE_STR(TRACE_SERVER, SERVER, "server_quit!");	
 		return true;
 	}
 }
 
 int server_destroy_clients(struct serv_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_SERVER, SERVER);
 	int res;
 	
 	/* set abort event */
@@ -301,10 +296,8 @@ int serv_clnt_connect(struct serv_env *p_env)
 			return res;
 
 		/* check if more connections can be accepted */
-		if (!BitScanForward(&idx, ~p_env->thread_bitmap)) {
-			DBG_TRACE_STR(TRACE_SERVER, SERVER, "max TCP connections! incoming connection refused");
+		if (!BitScanForward(&idx, ~p_env->thread_bitmap))
 			return E_SUCCESS;
-		}
 
 		/* accept incoming connection */
 		new_skt = accept(p_env->server_skt, NULL, NULL);
@@ -334,7 +327,6 @@ int serv_clnt_connect(struct serv_env *p_env)
 
 		/* mark thread handle as taken */
 		SET_BIT(p_env->thread_bitmap, idx);
-		DBG_TRACE_STR(TRACE_SERVER, SERVER, "start TCP connection %d", idx);
 
 		res = server_release(p_env);
 		if (res != E_SUCCESS)
@@ -373,7 +365,6 @@ int server_check_thread_status(struct serv_env *p_env, int ms)
 				PRINT_ERROR(E_WINAPI);
 				res = E_WINAPI;
 			}
-			DBG_TRACE_STR(TRACE_SERVER, SERVER, "end TCP connection   %d", idx);
 			CLR_BIT(p_env->thread_bitmap, idx);
 			break;
 		case WAIT_FAILED:
@@ -408,7 +399,6 @@ bool server_check_abort(struct serv_env *p_env)
 
 int server_cleanup(struct serv_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_SERVER, SERVER);
 	int ret_val = p_env->last_err;
 
 	if (p_env->olp_stdin.hEvent) {
@@ -467,7 +457,6 @@ int server_cleanup(struct serv_env *p_env)
 
 int server_send_msg(struct client *p_client, int type, char *p0, char *p1, char *p2, char *p3)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 	struct msg *p_msg = NULL;
 	int res;
 
@@ -478,7 +467,6 @@ int server_send_msg(struct client *p_client, int type, char *p0, char *p1, char 
 
 	/* send message */
 	res = send_msg(p_client->skt, &p_msg);
-	DBG_TRACE_MSG(TRACE_THREAD, p_client->username, p_msg);
 
 	/* free message */
 	free_msg(&p_msg);
@@ -487,10 +475,7 @@ int server_send_msg(struct client *p_client, int type, char *p0, char *p1, char 
 }
 
 int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_sec)
-{
-	if (p_client->connected)
-		DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-	
+{	
 	TIMEVAL tv;
 	int res = E_SUCCESS;
 
@@ -512,10 +497,6 @@ int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_s
 		else
 			break;
 	}
-
-	/* trace */
-	if (p_client->connected && (res == E_SUCCESS))
-		DBG_TRACE_MSG(TRACE_THREAD, p_client->username, *p_p_msg);
 
 	return res;
 }

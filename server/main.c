@@ -63,6 +63,6 @@ int main(int argc, char **argv)
 	/* free server resources */
 	ret_val = server_cleanup(&env);
 
-	printf("--- SERVER EXIT 0x%x ---\n", ret_val);
+	/* exit program */
 	return ret_val;
 }

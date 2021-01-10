@@ -21,9 +21,6 @@
  *     Nir Beiber
  */
 
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS// FIXME:
-
 /*
  ==============================================================================
  * INCLUDES
@@ -33,7 +30,6 @@
 #include "winsock2.h"
 #include <stdio.h>
 #include <stdbool.h>
-#include <assert.h>
 #include "client_tasks.h"
 #include "client_fsm.h"
 #include "tasks.h"
@@ -47,8 +43,6 @@
 
 int client_fsm_connect(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-
 	int res;
 
 	/* create socket */
@@ -75,8 +69,6 @@ int client_fsm_connect(struct client_env *p_env)
 
 int client_fsm_disconnect(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-
 	int res;
 
 	/* send disconncet message, return value does not matter
@@ -89,7 +81,6 @@ int client_fsm_disconnect(struct client_env *p_env)
 	if (res == E_SUCCESS) {
 		if (shutdown(p_env->skt, SD_SEND) == SOCKET_ERROR)
 			PRINT_ERROR(E_WINSOCK);
-		DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "gracefull disconnect");
 	}
 	
 	/*closesocket is called at client_cleanup() */
@@ -102,10 +93,7 @@ int client_fsm_disconnect(struct client_env *p_env)
 
 int client_fsm_connect_fail(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int res;
-
-	DBG_TRACE_STR(TRACE_CLIENT, p_env->username, "Error: %d", p_env->last_err);
 
 	/* send disconnect if was approved. result
 	 * does not matter since we are in an error
@@ -131,7 +119,6 @@ int client_fsm_connect_fail(struct client_env *p_env)
 
 client_fsm_reconnect(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int choice;
 
 	/* print menu and await choice */
@@ -153,7 +140,6 @@ client_fsm_reconnect(struct client_env *p_env)
 
 int client_fsm_request(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
@@ -192,9 +178,6 @@ int client_fsm_request(struct client_env *p_env)
 
 int client_fsm_denied(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	assert(!p_env->approved);
-
 	/* print message */
 	UI_PRINT(UI_CONNECT_DENY, p_env->server_ip, p_env->server_port);
 
@@ -204,9 +187,6 @@ int client_fsm_denied(struct client_env *p_env)
 
 int client_fsm_approved(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	assert(!p_env->approved);
-
 	/* change approval state */
 	p_env->approved = true;
 
@@ -219,8 +199,6 @@ int client_fsm_approved(struct client_env *p_env)
 
 int client_fsm_main_menu(struct client_env *p_env)
 {	
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	assert(p_env->approved);
 	struct msg *p_msg;
 	int res, choice;
 
@@ -260,7 +238,6 @@ int client_fsm_main_menu(struct client_env *p_env)
 
 int client_fsm_invite_setup(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	char buff[UI_INPUT_LEN] = {0};
 	int res;
@@ -299,9 +276,6 @@ int client_fsm_invite_setup(struct client_env *p_env)
 
 int client_fsm_game_req(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-	assert(p_env->approved);
-
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
@@ -336,7 +310,6 @@ int client_fsm_game_req(struct client_env *p_env)
 
 int client_fsm_undefined(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	PRINT_ERROR(E_FLOW);
 	
 	/* handle accorsing to approval state */
@@ -348,7 +321,6 @@ int client_fsm_undefined(struct client_env *p_env)
 
 int client_fsm_game_move(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res, next_state;
 	char buff[UI_INPUT_LEN] = {0};

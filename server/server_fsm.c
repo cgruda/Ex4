@@ -21,8 +21,6 @@
  *     Nir Beiber
  */
 
-#define _CRT_SECURE_NO_WARNINGS // FIXME:
-
 /*
  ==============================================================================
  * INCLUDES
@@ -30,7 +28,6 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
 #include "winsock2.h"
 #include "server_tasks.h"
 #include "server_fsm.h"
@@ -77,13 +74,6 @@ DWORD WINAPI client_thread(LPVOID param)
 
 int server_fsm_abort(struct client *p_client)
 {
-	/* trace */
-	if (p_client->username)
-		DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
-	if (p_client->username && (p_client->last_err != E_SUCCESS) && (p_client->last_err != E_GRACEFUL))
-		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "abort due to error: 0x%X", p_client->last_err);
-	
 	/* redirect to disconnect or cleanup */
 	if (p_client->connected)
 		return SERVER_FSM_DISCONNECT;
@@ -93,8 +83,6 @@ int server_fsm_abort(struct client *p_client)
 
 int server_fsm_disconnect(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res;
 
 	/* exit game. no point to check error since
@@ -107,7 +95,6 @@ int server_fsm_disconnect(struct client *p_client)
 	 * more data to send, closesocket at server_fsm_cleanup() */
 	if (p_client->last_err == E_GRACEFUL) {
 		res = shutdown(p_client->skt, SD_SEND);
-		DBG_TRACE_STR(TRACE_THREAD, p_client->username, "gracefull disconnect");
 		if (res == SOCKET_ERROR)
 			PRINT_ERROR(E_WINSOCK);
 		else
@@ -129,8 +116,8 @@ int server_fsm_cleanup(struct client *p_client)
 {
 	/* free resources */
 	if (p_client->username) {
-		DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 		free(p_client->username);
+		p_client->username = NULL;
 	}
 
 	/* close threads socket */
@@ -144,9 +131,7 @@ int server_fsm_cleanup(struct client *p_client)
 }
 
 int server_fsm_menu(struct client *p_client)
-{
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-	
+{	
 	int res;
 	struct msg *p_msg;
 	int next_state;
@@ -188,8 +173,6 @@ int server_fsm_menu(struct client *p_client)
 
 int server_fsm_game_request(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res, next_state;
 	struct game *p_game = NULL;
 	char buff[SEQUENCE_BUFF_LEN] = {0};
@@ -233,8 +216,6 @@ int server_fsm_game_request(struct client *p_client)
 
 int server_fsm_invite_and_setup(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res, next_state;
 	struct msg *p_msg = NULL;
 	char dummy_write[SEQUENCE_BUFF_LEN] = {0}, dummy_read[SEQUENCE_BUFF_LEN] = {0};
@@ -293,8 +274,6 @@ int server_fsm_invite_and_setup(struct client *p_client)
 
 int server_fsm_no_opponents(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res;
 
 	/* destroy game */
@@ -317,8 +296,6 @@ int server_fsm_no_opponents(struct client *p_client)
 
 int server_fsm_approve(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res;
 	
 	/* send approval message */
@@ -333,9 +310,7 @@ int server_fsm_approve(struct client *p_client)
 }
 
 int server_fsm_deny(struct client *p_client)
-{
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-	
+{	
 	int res;
 	
 	/* send deny message */
@@ -377,11 +352,6 @@ int server_fsm_connect(struct client *p_client)
 		return SERVER_FSM_ABORT;
 	}
 	memcpy(p_client->username, p_msg->param_lst[0], strlen(p_msg->param_lst[0]));
-	
-	/* start tracing the thread */
-	DBG_TRACE_INIT(TRACE_THREAD, p_client->username);
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-	DBG_TRACE_MSG(TRACE_THREAD, p_client->username, p_msg);
 
 	/* free resource */
 	free_msg(&p_msg);
@@ -412,7 +382,6 @@ int server_fsm_connect(struct client *p_client)
 
 int server_fsm_opponent_quit(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
 	int res;
 
 	/* send message to client */
@@ -435,8 +404,6 @@ int server_fsm_opponent_quit(struct client *p_client)
 
 int server_fsm_player_move(struct client *p_client)
 {
-	DBG_TRACE_FUNC(TRACE_THREAD, p_client->username);
-
 	int res = E_SUCCESS, next_state = SERVER_FSM_ABORT, bulls = 0, cows = 0;
 	char opp_guess[10] = {0}, send_result[10] = {0}, recv_result[10] = {0};
 	char *winner_name = NULL, bulls_s[2] = {0}, cows_s[2] = {0};

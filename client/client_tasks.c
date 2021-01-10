@@ -1,15 +1,17 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client side
+ * client program
  *
  * client_tasks.c
+ * 
+ * this module hols clients tasks
  * 
  * by: Chaim Gruda
  *     Nir Beiber
  */
+
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS // FIXME:
 
 /*
  ==============================================================================
@@ -84,7 +86,6 @@ int check_input(struct client_env *p_env, int argc, char** argv)
 
 int client_init(struct client_env *p_env)
 {
-	DBG_TRACE_INIT(TRACE_CLIENT, p_env->username);
 	WSADATA	wsa_data;
 	int res;
 
@@ -107,7 +108,6 @@ int client_init(struct client_env *p_env)
 
 int client_send_msg(struct client_env *p_env, int type, char *param)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	struct msg *p_msg = NULL;
 	int res;
 
@@ -119,8 +119,6 @@ int client_send_msg(struct client_env *p_env, int type, char *param)
 	/* send message */
 	res = send_msg(p_env->skt, &p_msg);
 
-	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, p_msg); // FIXME:
-
 	/* free message */
 	free_msg(&p_msg);
 
@@ -129,22 +127,17 @@ int client_send_msg(struct client_env *p_env, int type, char *param)
 
 int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_sec)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
 	int res;
 	TIMEVAL tv = {0};
 
 	tv.tv_sec = timeout_sec;
 	res = recv_msg(p_p_msg, p_env->skt, &tv);
 
-	DBG_TRACE_MSG(TRACE_CLIENT, p_env->username, *p_p_msg);
-
 	return res;
 }
 
 int client_cleanup(struct client_env *p_env)
 {
-	DBG_TRACE_FUNC(TRACE_CLIENT, p_env->username);
-
 	int ret_val = p_env->last_err;
 
 	if (WSACleanup()) {

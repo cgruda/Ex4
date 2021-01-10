@@ -47,6 +47,5 @@ int main(int argc, char **argv)
 	ret_val = client_cleanup(&env);
 
 	/* exit program */
-	printf("--- CLIENT EXIT 0x%x ---\n", ret_val);
 	return ret_val;
 }

@@ -29,11 +29,6 @@
  ==============================================================================
  */
 
-// debug prints enable
-#define DBG_ENABLE     1
-#define DBG_TRACE      1
-#define SERVER         "server"
-
 // time conversion
 #define MS2US                1000
 #define SEC2MS               1000
@@ -69,21 +64,14 @@ enum err_val {
  ==============================================================================
  */
 
-#if DBG_ENABLE
+// print macros
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 #define DBG_STAMP() printf("[%-14s;%-3d] ", __FILENAME__, __LINE__)
-#define DBG_PRINT(...) do {DBG_STAMP(); printf(__VA_ARGS__);} while (0)
-#define DBG_FUNC_STAMP() do {DBG_STAMP(); printf("%s\n", __func__);} while (0)
-#else
-#define __FILENAME__
-#define DBG_PRINT(...)
-#define DBG_FUNC_STAMP()
-#define DBG_STAMP()
-#endif
 
 // print error message
 #define PRINT_ERROR(err_val)   do {DBG_STAMP(); print_error((err_val));} while (0)
 
+// bit operations
 #define BIT(pos) (1 << (pos))
 #define SET_BIT(map, pos) ((map) |= BIT(pos))
 #define CLR_BIT(map, pos) ((map) &= ~BIT(pos))
@@ -102,60 +90,6 @@ enum err_val {
  ******************************************************************************
  */
 void print_error(int err_val);
-
-
-enum trace_mode {
-	TRACE_CLIENT,
-	TRACE_SERVER,
-	TRACE_THREAD,
-	TRACE_MAX,
-};
-
-#if DBG_TRACE
-
-#define DBG_TRACE_INIT(mode, name) dbg_trace_init(mode, name)
-// #define DBG_TRACE_LOG(mode, name, str) dbg_trace_log(mode, name, str)
-
-#define DBG_TRACE_LOG(mode, name, ...) do {							\
-		char dbg_trace_log_str[100] = {0};						\
-		sprintf(dbg_trace_log_str, __VA_ARGS__);					\
-		dbg_trace_log(mode, name, dbg_trace_log_str);					\
-	} while (0)
-
-#define DBG_TRACE_STAMP(mode, name) do {							\
-		char dbg_trace_stamp_str[100] = {0};						\
-		sprintf(dbg_trace_stamp_str, "[%-14s;%-3d] ", __FILENAME__, __LINE__);		\
-		DBG_TRACE_LOG(mode, name, dbg_trace_stamp_str);					\
-	} while (0)
-
-
-#define DBG_TRACE_STR(mode, name, ...) do {							\
-		DBG_TRACE_STAMP(mode, name);							\
-		DBG_TRACE_LOG(mode, name, __VA_ARGS__);						\
-		DBG_TRACE_LOG(mode, name, "\n");						\
-	} while (0)
-
-#define DBG_TRACE_FUNC(mode, name) do { 							\
-		DBG_TRACE_STR(mode, name, __func__);						\
-	} while (0)
-
-#define DBG_TRACE_MSG(mode, name, p_msg) do {							\
-		char *dbg_trace_msg_2_str_str = dbg_trace_msg_2_str(p_msg);			\
-		DBG_TRACE_LOG(mode, name, dbg_trace_msg_2_str_str);				\
-		free(dbg_trace_msg_2_str_str);							\
-	} while (0)
-
-char *dbg_trace_get_path(int mode, char *name);
-void dbg_trace_init(int mode, char *name);
-void dbg_trace_log(int mode, char *name, char *str);
-#else
-#define DBG_TRACE_INIT(mode, name)
-#define DBG_TRACE_LOG(mode, name, ...)
-#define DBG_TRACE_STAMP(mode, name)
-#define DBG_TRACE_STR(mode, name, ...)
-#define DBG_TRACE_FUNC(mode, name)
-#define DBG_TRACE_MSG(mode, name, p_msg)
-#endif
 
 
 #endif // __TASKS_H__

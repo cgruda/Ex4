@@ -14,14 +14,6 @@
 
 /*
  ==============================================================================
- * PRAGMAS
- ==============================================================================
- */
-
-#define _CRT_SECURE_NO_WARNINGS // FIXME:
-
-/*
- ==============================================================================
  * INCLUDES
  ==============================================================================
  */
@@ -29,23 +21,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <ctype.h>
 #include "winsock2.h"
 #include "tasks.h"
-
-/*
- ==============================================================================
- * GLOBAL VARS
- ==============================================================================
- */
-
-#if DBG_TRACE
-char *dbg_trace_mode_2_str[TRACE_MAX] = { // FIXME:
-	[TRACE_CLIENT] = "client_",
-	[TRACE_THREAD] = "thread_",
-	[TRACE_SERVER] = "",
-};
-#endif
 
 /*
  ==============================================================================
@@ -87,53 +64,3 @@ void print_error(int err_val)
 		printf("Unknown Error 0x%02X\n", err_val);
 	}
 }
-
-#if DBG_TRACE // FIXME:
-char *dbg_trace_get_path(int mode, char *name)
-{
-	char *path = calloc(100, sizeof(char));
-	char *pre  = dbg_trace_mode_2_str[mode];
-	if (!path) {
-		PRINT_ERROR(E_INTERNAL);
-		exit(E_FAILURE);
-	}
-
-	memcpy(path, "trace\\", strlen("trace\\"));
-	memcpy(path + strlen(path), pre, strlen(pre));
-	memcpy(path + strlen(path), name, strlen(name));
-	memcpy(path + strlen(path), ".txt", strlen(".txt"));
-
-	return path;
-}
-
-void dbg_trace_init(int mode, char *name)
-{
-	char *path = dbg_trace_get_path(mode, name);
-
-	FILE *fp = fopen(path, "w");
-	if (!fp) {
-		PRINT_ERROR(E_INTERNAL);
-		exit(E_FAILURE);
-	}
-
-	fclose(fp);
-	free(path);
-}
-
-void dbg_trace_log(int mode, char *name, char *str)
-{
-	char *path = dbg_trace_get_path(mode, name);
-
-	FILE *fp = fopen(path, "a");
-	if (!fp) {
-		PRINT_ERROR(E_INTERNAL);
-		exit(E_FAILURE);
-	}
-
-	fprintf(fp, str);
-
-	fclose(fp);
-	free(path);
-}
-
-#endif // DBG_TRACE
