@@ -83,7 +83,7 @@ int client_fsm_disconnect(struct client_env *p_env)
 			PRINT_ERROR(E_WINSOCK);
 	}
 	
-	/*closesocket is called at client_cleanup() */
+	/* closesocket is called at client_cleanup() */
 
 	/* change approval state */
 	p_env->approved = false;
@@ -242,29 +242,36 @@ int client_fsm_invite_setup(struct client_env *p_env)
 	char buff[UI_INPUT_LEN] = {0};
 	int res;
 	
+	/* notify player */
 	UI_PRINT(UI_GAME_START);
 
+	/* await setup request */
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_DEFAULT);
 	if (res != E_SUCCESS) {
 		p_env->last_err = res;
 		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
+	/* interpet message from server */
 	if (p_msg->type != MSG_SERVER_SETUP_REQUEST) {
 		free_msg(&p_msg);
 		return CLIENT_FSM_UNDEFINED;
 	}
 
+	/* free resource */
 	free_msg(&p_msg);
 
+	/* notify player */
 	UI_PRINT(UI_GAME_CHOOSE);
 
+	/* get input from player */
 	if (!client_game_input_get(buff)) {
 		print_error(E_INPUT);
 		p_env->last_err = E_INPUT;
 		return CLIENT_FSM_DISCONNECT;
 	}
 
+	/* send setup numbers */
 	res = client_send_msg(p_env, MSG_CLIENT_SETUP, buff);
 	if (res != E_SUCCESS) {
 		p_env->last_err = res;
@@ -279,18 +286,21 @@ int client_fsm_game_req(struct client_env *p_env)
 	struct msg *p_msg = NULL;
 	int res, next_state;
 
+	/* ask to join a game */
 	res = client_send_msg(p_env, MSG_CLIENT_VERSUS, NULL);
 	if (res != E_SUCCESS) {
 		p_env->last_err = res;
 		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
+	/* await answer */
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMEOUT_SEC_MAX);
 	if (res != E_SUCCESS) {
 		p_env->last_err = res;
 		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
+	/* interpret answer */
 	switch (p_msg->type) {
 	case MSG_SERVER_NO_OPONENTS:
 		next_state = CLIENT_FSM_MAIN_MENU;
@@ -303,6 +313,7 @@ int client_fsm_game_req(struct client_env *p_env)
 		break;
 	}
 
+	/* free reource */
 	free_msg(&p_msg);
 
 	return next_state;
@@ -325,12 +336,14 @@ int client_fsm_game_move(struct client_env *p_env)
 	int res, next_state;
 	char buff[UI_INPUT_LEN] = {0};
 
+	/* await message from server */
 	res = client_recv_msg(&p_msg, p_env, MSG_TIMOUT_SEC_HUMAN_MAX);
 	if (res != E_SUCCESS) {
 		p_env->last_err = res;
 		return CLIENT_FSM_CONNECT_FAIL;
 	}
 
+	/* interpret message */
 	switch (p_msg->type) {
 	case MSG_SERVER_PLAYER_MOVE_REQUEST:
 		UI_PRINT(UI_GAME_GUESS);
@@ -373,6 +386,7 @@ int client_fsm_game_move(struct client_env *p_env)
 		break;
 	}
 
+	/* free resource */
 	free_msg(&p_msg);
 
 	return next_state;

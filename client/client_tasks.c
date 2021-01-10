@@ -130,6 +130,7 @@ int client_recv_msg(struct msg **p_p_msg, struct client_env *p_env, int timeout_
 	int res;
 	TIMEVAL tv = {0};
 
+	/* set timeout and call recieve */
 	tv.tv_sec = timeout_sec;
 	res = recv_msg(p_p_msg, p_env->skt, &tv);
 
@@ -150,11 +151,14 @@ int client_cleanup(struct client_env *p_env)
 
 bool client_game_input_get(char *buff)
 {
+	/* scan stdin */
 	scanf_s(" %s", buff, 5);
 
+	/* check validity */
 	if (strlen(buff) < 4)
 		return false;
 
+	/* check validity */
 	for (int i = 0; i < 4; i++)
 		for (int j = i + 1; j < 4; j++)
 			if ((buff[i] == buff[j]) || buff[i] < '0' || buff[i] > '9')

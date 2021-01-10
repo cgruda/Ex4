@@ -465,7 +465,7 @@ int server_fsm_player_move(struct client *p_client)
 	bulls_s[0] = '0' + bulls;
 	cows_s[0] = '0' + cows;
 
-	/* check results */
+	/* check results and send message accordingly */
 	if (i_won && opp_won) {
 		res = server_send_msg(p_client, MSG_SERVER_DRAW, NULL, NULL, NULL, NULL);
 		next_state = SERVER_FSM_MENU;
