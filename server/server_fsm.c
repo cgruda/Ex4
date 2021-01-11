@@ -9,7 +9,7 @@
  * each function is this module a state the server thread can be in.
  * each function (state) returns the next state. moving between
  * states is done using an array of funtions, where functions
- * are indexed by their states, as defined in enum state_clnt.
+ * are indexed by their states, as defined in enum client_fsm.
  *
  * the first state in the FSM is: SERVER_FSM_CONNECT
  * the last state in the FSM is: SERVER_FSM_EXIT

@@ -9,7 +9,7 @@
  * each function is this module a state the client can be in.
  * each function (state) returns the next state. moving between
  * states is done using an array of funtions, where functions
- * are indexed by their states, as defined in enum state_clnt.
+ * are indexed by their states, as defined in enum client_fsm.
  *
  * the first state in the FSM is: CLIENT_FSM_CONNECT
  * the last state in the FSM is: CLIENT_FSM_EXIT
@@ -393,7 +393,7 @@ int client_fsm_game_move(struct client_env *p_env)
 }
 
 // client finite state machine functions array defenition
-int(*clnt_flow[CLIENT_FSM_MAX])(struct client_env *p_env) = {
+int(*client_fsm[CLIENT_FSM_MAX])(struct client_env *p_env) = {
 	[CLIENT_FSM_CONNECT]      = client_fsm_connect,
 	[CLIENT_FSM_CONNECT_FAIL] = client_fsm_connect_fail,
 	[CLIENT_FSM_APPROVED]     = client_fsm_approved,

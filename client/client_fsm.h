@@ -40,7 +40,7 @@
  ==============================================================================
  */
 
-enum state_clnt {
+enum client_fsm {
 	CLIENT_FSM_EXIT,
 	CLIENT_FSM_CONNECT,
 	CLIENT_FSM_CONNECT_FAIL,
@@ -83,7 +83,7 @@ enum user_choice {
  */
 
 // client finite state machine functions array declaration
-int(*clnt_flow[CLIENT_FSM_MAX])(struct client_env *p_env);
+int(*client_fsm[CLIENT_FSM_MAX])(struct client_env *p_env);
 
 
 #endif // __CLIENT_FLOW_H__

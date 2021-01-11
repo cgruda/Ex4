@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 
 	/* client execution loop */
 	while (state != CLIENT_FSM_EXIT)
-		state = (*clnt_flow[state])(&env);
+		state = (*client_fsm[state])(&env);
 
 	/* free client resources */
 	ret_val = client_cleanup(&env);
