@@ -85,11 +85,16 @@ int server_fsm_disconnect(struct client *p_client)
 {
 	int res;
 
-	/* exit game. no point to check error since
-	 * thread is exiting anyway. error print will
-	 * come from within call */
-	if (p_client->playing)
+	/* exit game */ 
+	if (p_client->playing) {
+		/* and raise abort game event, so that opponent wont
+		 * need to wait long to get notified that i quit. */
+		if (!SetEvent(p_client->p_env->game.h_abort_game_evt))
+			PRINT_ERROR(E_WINAPI);
+		/* since this is an exit flow the return value does
+		 * not matter, errors printed from whithin */
 		game_session_end(p_client);
+	}
 
 	/* handle gracefull disconnect: indicate server has no
 	 * more data to send, closesocket at server_fsm_cleanup() */

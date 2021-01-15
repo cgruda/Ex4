@@ -488,7 +488,6 @@ int server_recv_msg(struct client *p_client, struct msg **p_p_msg, int timeout_s
 		if (server_check_abort(p_client->p_env))
 			return E_INTERNAL;
 
-		
 		tv.tv_sec  = 0;
 		tv.tv_usec = MSG_TIME_INCERMENT_USEC;
 		res = recv_msg(p_p_msg, p_client->skt, &tv);

@@ -34,6 +34,7 @@
 #define GAME_START_WAIT_TIME_SEC      15
 #define GAME_MOVE_WAIT_TIME_SEC       600 // 10 mins
 #define GAME_INTERNAL_WAIT_TIME_SEC   20
+#define GAME_TIME_INCERMENT_MS        500
 #define BULLS_WIN                     4
 #define SEQUENCE_BUFF_LEN             25
 #define RESULT_FORMAT_STRLEN          4
@@ -50,6 +51,7 @@ struct game {
 	int players_cnt;
 	bool accept_new_players;
 	HANDLE h_play_evt[GAME_MAX_PLAYERS];
+	HANDLE h_abort_game_evt;
 	HANDLE h_game_mtx;
 };
 

@@ -54,6 +54,13 @@ int game_init(struct game *p_game)
 		return E_WINAPI;
 	}
 
+	/* event to to notify game was aborted */
+	p_game->h_abort_game_evt = CreateEvent(NULL, FALSE, FALSE, NULL);
+	if (p_game->h_abort_game_evt == NULL) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
 	/* delete game session file incase it exists */
 	if (!DeleteFileA(PATH_GAME_SESSION)) {
 		if (GetLastError() != ERROR_FILE_NOT_FOUND) {
@@ -88,6 +95,13 @@ int game_cleanup(struct game *p_game)
 	
 	if (p_game->h_play_evt[1]) {
 		if (!CloseHandle(p_game->h_play_evt[1])) {
+			PRINT_ERROR(E_WINAPI);
+			ret_val = E_WINAPI;
+		}
+	}
+
+	if (p_game->h_abort_game_evt) {
+		if (!CloseHandle(p_game->h_abort_game_evt)) {
 			PRINT_ERROR(E_WINAPI);
 			ret_val = E_WINAPI;
 		}
@@ -220,6 +234,12 @@ int create_game(struct client *p_client)
 
 	/* close handle to session file */
 	if (!CloseHandle(h_file)) {
+		PRINT_ERROR(E_WINAPI);
+		return E_WINAPI;
+	}
+
+	/* make sure abort game event is reset */
+	if (!ResetEvent(p_game->h_abort_game_evt)) {
 		PRINT_ERROR(E_WINAPI);
 		return E_WINAPI;
 	}
@@ -413,6 +433,57 @@ int game_session_read(struct client *p_client, char *buffer)
 	return res;
 }
 
+int game_sequence_wait(struct client *p_client, int timeout_sec)
+{
+	struct game *p_game = &p_client->p_env->game;
+	HANDLE *h_evt = &p_game->h_play_evt[p_client->opp_pos];
+	HANDLE *h_game_abort_evt = &p_game->h_abort_game_evt;
+	DWORD wait_code;
+	int incerments;
+
+	incerments = timeout_sec * (SEC2MS / GAME_TIME_INCERMENT_MS);
+	
+	/* wait is split to allow checking abort from main thread,
+	 * and to check if second player quit for any reason. */
+	while (incerments--) {
+
+		/* abort from main thread */
+		if (server_check_abort(p_client->p_env))
+			return E_TIMEOUT;
+
+		/* second player quit */
+		wait_code = WaitForSingleObject(*h_game_abort_evt, 0);
+		switch (wait_code) {
+		case WAIT_OBJECT_0:
+			return E_TIMEOUT;
+		case WAIT_TIMEOUT:
+			break;
+		case WAIT_FAILED:
+			PRINT_ERROR(E_WINAPI);
+			/* fall through */
+		default:
+			return E_WINAPI;
+		}
+
+		/* opponent played event */
+		wait_code = WaitForSingleObject(*h_evt, GAME_TIME_INCERMENT_MS);
+		switch (wait_code) {
+		case WAIT_TIMEOUT:
+			continue;
+		case WAIT_OBJECT_0:
+			return E_SUCCESS;
+		case WAIT_FAILED:
+			PRINT_ERROR(E_WINAPI);
+			/* fall through */
+		default:
+			return E_WINAPI;
+		}
+	}
+
+	/* all incerments passed */
+	return E_TIMEOUT;
+}
+
 int game_sequence(struct client *p_client, char *write_buff, char *read_buff, int timeout_sec)
 {
 	struct game *p_game = &p_client->p_env->game;
@@ -453,11 +524,11 @@ int game_sequence(struct client *p_client, char *write_buff, char *read_buff, in
 		res = game_release(p_game);
 		if (res != E_SUCCESS)
 			break;
-		wait_code = WaitForSingleObject(*h_evt, timeout_sec * SEC2MS);
-		if (wait_code == WAIT_TIMEOUT) {
+		res = game_sequence_wait(p_client, timeout_sec);
+		if (res == E_TIMEOUT) {
 			res = E_TIMEOUT;
 			break;
-		} else if (wait_code == WAIT_OBJECT_0) {
+		} else if (res == E_SUCCESS) {
 			res = game_lock(p_game);
 			if (res != E_SUCCESS)
 				break;
