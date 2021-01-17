@@ -1,7 +1,6 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * client program
  *
  * message.c
  * 
@@ -306,8 +305,8 @@ int recv_msg(struct msg **p_p_msg, SOCKET skt, PTIMEVAL p_timeout)
 	else if (res == SOCKET_ERROR)
 		return E_WINSOCK;
 
-	/* peek untill got a full message, infdicated by
-	 * EOL, then reed inly up to there, leaving next
+	/* peek untill got a full message, indicated by
+	 * EOL, then read only up to there, leaving next
 	 * messages still in socket queue */
 	do {
 		res = recv(skt, buff, MSG_BUFF_MAX, MSG_PEEK);

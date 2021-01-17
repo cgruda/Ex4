@@ -83,7 +83,8 @@ int client_fsm_disconnect(struct client_env *p_env)
 			PRINT_ERROR(E_WINSOCK);
 	}
 	
-	/* closesocket is called at client_cleanup() */
+	/* closesocket is called at client_cleanup()
+	 * or at client_fsm_connect_fail() */
 
 	/* change approval state */
 	p_env->approved = false;
@@ -112,6 +113,7 @@ int client_fsm_connect_fail(struct client_env *p_env)
 		p_env->last_err = E_WINSOCK;
 		return CLIENT_FSM_EXIT;
 	}
+	p_env->skt = INVALID_SOCKET;
 
 	/* go to reconnect menu */
 	return CLIENT_FSM_RECONNECT;

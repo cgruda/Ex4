@@ -141,6 +141,14 @@ int client_cleanup(struct client_env *p_env)
 {
 	int ret_val = p_env->last_err;
 
+	/* close socket - terminate TCP connection */
+	if (p_env->skt != INVALID_SOCKET) {
+		if (closesocket(p_env->skt) == SOCKET_ERROR) {
+			PRINT_ERROR(E_WINSOCK);
+			ret_val = E_WINSOCK;
+		}
+	}
+
 	if (WSACleanup()) {
 		PRINT_ERROR(E_WINSOCK);
 		ret_val = E_WINSOCK;

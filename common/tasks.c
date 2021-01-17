@@ -1,7 +1,6 @@
 /**
  * ISP_HW_4_2020
  * Bulls & Cows
- * common
  *
  * tasks.c
  * 
